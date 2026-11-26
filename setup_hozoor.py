@@ -20,6 +20,7 @@ path = "uniffi-bindgen.rs"
 uniffi = { version = "0.28.3", features = ["cli"] }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 calamine = "0.26.1"
+zip = "=2.5.0"
 rust_xlsxwriter = "0.80.0"
 thiserror = "2.0"
 
