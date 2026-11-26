@@ -49,6 +49,9 @@ jobs:
             --library target/release/libhozoor_core.so \
             --language kotlin \
             --out-dir ../android-app/app/src/main/java
+          test -n "$(find ../android-app/app/src/main/java -name 'hozoor_core.kt' -print -quit)" || {
+            echo "UniFFI bindings were not generated"; exit 1;
+          }
 
       - name: 9. Download Vazirmatn-FD Font
         run: |
