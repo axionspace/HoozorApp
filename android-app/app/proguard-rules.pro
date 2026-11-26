@@ -1,0 +1,5 @@
+-keep class com.sun.jna.** { *; }
+-keep class * implements com.sun.jna.** { *; }
+-keep class uniffi.hozoor_core.** { *; }
+-dontwarn java.awt.**
+-dontwarn com.sun.jna.**
