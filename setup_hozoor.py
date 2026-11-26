@@ -27,7 +27,6 @@ thiserror = "2.0"
 opt-level = "z"
 lto = true
 codegen-units = 1
-panic = "abort"
 strip = true
 ''',
 
