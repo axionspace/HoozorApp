@@ -28,7 +28,6 @@ thiserror = "2.0"
 opt-level = "z"
 lto = true
 codegen-units = 1
-strip = true
 ''',
 
     "rust-core/uniffi-bindgen.rs": r'''fn main() {
