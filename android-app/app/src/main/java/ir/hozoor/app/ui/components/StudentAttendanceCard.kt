@@ -138,7 +138,7 @@ fun StudentAttendanceCard(
             }
 
             // نمایش برچسب ساعت خروج از کلاس (قابل لمس برای ویرایش ساعت خروج)
-            AnimatedVisibility(visible = student.currentStatus == AttendanceStatus.LeftClass) {
+            AnimatedVisibility(visible = student.currentStatus == AttendanceStatus.LEFT_CLASS) {
                 Surface(
                     onClick = onRequestLeftClass,
                     shape = RoundedCornerShape(12.dp),
@@ -177,7 +177,7 @@ fun StudentAttendanceCard(
                     AnimatedStatusPill("موجه", Icons.Rounded.VerifiedUser, student.currentStatus == AttendanceStatus.EXCUSED, StatusColors.Excused, StatusColors.OnExcused, Modifier.weight(1f)) {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onStatusChange(AttendanceStatus.EXCUSED)
                     }
-                    AnimatedStatusPill("خروج", Icons.Rounded.DirectionsRun, student.currentStatus == AttendanceStatus.LeftClass, StatusColors.LeftClass, StatusColors.OnLeftClass, Modifier.weight(1f)) {
+                    AnimatedStatusPill("خروج", Icons.Rounded.DirectionsRun, student.currentStatus == AttendanceStatus.LEFT_CLASS, StatusColors.LeftClass, StatusColors.OnLeftClass, Modifier.weight(1f)) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress); onRequestLeftClass()
                     }
                 }
@@ -185,10 +185,10 @@ fun StudentAttendanceCard(
 
             Spacer(Modifier.height(9.dp))
 
-            val canNotify = student.currentStatus in listOf(AttendanceStatus.ABSENT, AttendanceStatus.LATE, AttendanceStatus.LeftClass)
+            val canNotify = student.currentStatus in listOf(AttendanceStatus.ABSENT, AttendanceStatus.LATE, AttendanceStatus.LEFT_CLASS)
             val notifyLabel = when (student.currentStatus) {
                 AttendanceStatus.LATE -> "پیام تأخیر"
-                AttendanceStatus.LeftClass -> "پیام خروج"
+                AttendanceStatus.LEFT_CLASS -> "پیام خروج"
                 else -> "پیام غیبت"
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -251,7 +251,7 @@ fun statusPrimaryColor(st: AttendanceStatus): Color = when (st) {
     AttendanceStatus.ABSENT -> StatusColors.Absent
     AttendanceStatus.LATE -> StatusColors.Late
     AttendanceStatus.EXCUSED -> StatusColors.Excused
-    AttendanceStatus.LeftClass -> StatusColors.LeftClass
+    AttendanceStatus.LEFT_CLASS -> StatusColors.LeftClass
     else -> StatusColors.Present
 }
 
@@ -259,7 +259,7 @@ fun statusOnColor(st: AttendanceStatus): Color = when (st) {
     AttendanceStatus.ABSENT -> StatusColors.OnAbsent
     AttendanceStatus.LATE -> StatusColors.OnLate
     AttendanceStatus.EXCUSED -> StatusColors.OnExcused
-    AttendanceStatus.LeftClass -> StatusColors.OnLeftClass
+    AttendanceStatus.LEFT_CLASS -> StatusColors.OnLeftClass
     else -> StatusColors.OnPresent
 }
 

@@ -114,7 +114,7 @@ fun ExportAndReportSheet(
     }
 
     val flaggedStudents = remember(students) {
-        students.filter { it.currentStatus in listOf(AttendanceStatus.ABSENT, AttendanceStatus.LATE, AttendanceStatus.LeftClass) && it.mobile.isNotBlank() }
+        students.filter { it.currentStatus in listOf(AttendanceStatus.ABSENT, AttendanceStatus.LATE, AttendanceStatus.LEFT_CLASS) && it.mobile.isNotBlank() }
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -211,7 +211,7 @@ fun ExportAndReportSheet(
                 item {
                     FilterChip(
                         selected = msgMode == 4,
-                        onClick = { onLoadPeriodGroupMessage(AttendanceStatus.LeftClass) { txt -> msgMode = 4; editableText = txt } },
+                        onClick = { onLoadPeriodGroupMessage(AttendanceStatus.LEFT_CLASS) { txt -> msgMode = 4; editableText = txt } },
                         label = { Text("خروج از کلاس (${toPersianDigits(summary.leftClass.toString())})") }
                     )
                 }
@@ -262,7 +262,7 @@ fun ExportAndReportSheet(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("${st.firstName} ${st.lastName}", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                                 Text(
-                                    text = if (st.currentStatus == AttendanceStatus.LeftClass && st.exitTime.isNotBlank()) "خروج ${toPersianDigits(st.exitTime)}" else st.currentStatus.labelFa(),
+                                    text = if (st.currentStatus == AttendanceStatus.LEFT_CLASS && st.exitTime.isNotBlank()) "خروج ${toPersianDigits(st.exitTime)}" else st.currentStatus.labelFa(),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = statusPrimaryColor(st.currentStatus)
                                 )
@@ -312,6 +312,6 @@ private fun AttendanceStatus.labelFa(): String = when (this) {
     AttendanceStatus.ABSENT -> "غایب"
     AttendanceStatus.LATE -> "تأخیر"
     AttendanceStatus.EXCUSED -> "موجه"
-    AttendanceStatus.LeftClass -> "خروج از کلاس"
+    AttendanceStatus.LEFT_CLASS -> "خروج از کلاس"
     else -> "حاضر"
 }
