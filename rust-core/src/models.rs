@@ -37,6 +37,15 @@ impl Period {
             Period::Fourth => Some(Period::Third),
         }
     }
+
+    pub fn label_fa(self) -> &'static str {
+        match self {
+            Period::First => "زنگ اول",
+            Period::Second => "زنگ دوم",
+            Period::Third => "زنگ سوم",
+            Period::Fourth => "زنگ چهارم",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
@@ -75,7 +84,7 @@ impl AttendanceStatus {
             AttendanceStatus::Present => "حاضر",
             AttendanceStatus::Absent => "غایب",
             AttendanceStatus::Late => "تأخیر",
-            AttendanceStatus::Excused => "موجه",
+            AttendanceStatus::Excused => "غیبت موجه",
         }
     }
 }
@@ -116,6 +125,7 @@ pub struct PeriodSummary {
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct ClassAttendanceSnapshot {
     pub jalali_date: String,
+    pub is_period_saved: bool,
     pub summary: PeriodSummary,
     pub students: Vec<StudentAttendanceRow>,
 }
@@ -134,6 +144,24 @@ pub struct PrincipalReportBundle {
     pub full_day_absent_count: i32,
     pub partial_absent_count: i32,
     pub late_count: i32,
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct TopStudentCount {
+    pub full_name: String,
+    pub count: i32,
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct ClassAnalytics {
+    pub student_count: i32,
+    pub recorded_sessions: i32,
+    pub total_absent: i32,
+    pub total_late: i32,
+    pub total_excused: i32,
+    pub top_absent: Vec<TopStudentCount>,
+    pub top_late: Vec<TopStudentCount>,
+    pub top_excused: Vec<TopStudentCount>,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -169,4 +197,20 @@ pub struct JalaliYearMonth {
     pub year: i32,
     pub month: i32,
     pub label: String,
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct JalaliDayCell {
+    pub day: i32,
+    pub date_iso: String,
+    pub is_friday: bool,
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct JalaliMonthGrid {
+    pub year: i32,
+    pub month: i32,
+    pub month_label: String,
+    pub leading_blanks: i32,
+    pub days: Vec<JalaliDayCell>,
 }

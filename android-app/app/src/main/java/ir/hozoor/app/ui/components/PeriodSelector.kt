@@ -41,9 +41,7 @@ fun PeriodSelector(
     val haptic = LocalHapticFeedback.current
 
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)
     ) {
         ALL_PERIODS.forEachIndexed { index, (period, label) ->
@@ -66,7 +64,7 @@ fun PeriodSelector(
                     checkedContainerColor = MaterialTheme.colorScheme.primary,
                     checkedContentColor = MaterialTheme.colorScheme.onPrimary,
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    contentColor = MaterialTheme.colorScheme.onSurface
                 )
             ) {
                 if (checked) {
@@ -76,7 +74,7 @@ fun PeriodSelector(
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (checked) FontWeight.Bold else FontWeight.Medium,
+                    fontWeight = if (checked) FontWeight.ExtraBold else FontWeight.Medium,
                     maxLines = 1
                 )
             }

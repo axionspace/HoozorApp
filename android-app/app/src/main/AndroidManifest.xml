@@ -4,7 +4,7 @@
         android:name=".HozoorApplication"
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher_hozoor"
-        android:label="حضور"
+        android:label="حضور و غیاب"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 

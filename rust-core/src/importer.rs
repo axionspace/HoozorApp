@@ -1,5 +1,5 @@
 use crate::models::{CoreError, ImportReport};
-use crate::persian::{normalize_mobile, normalize_national_id, normalize_persian};
+use crate::persian::{is_middle_grade, normalize_mobile, normalize_national_id, normalize_persian};
 use calamine::{open_workbook_auto_from_rs, Data, Reader};
 use rusqlite::{params, Connection};
 use std::io::Cursor;
@@ -35,17 +35,13 @@ pub fn import_file_bytes(
         import_excel_bytes(conn, bytes, replace_existing)
     } else {
         let text = String::from_utf8(bytes.to_vec()).map_err(|_| {
-            CoreError::Import("کدگذاری فایل CSV معتبر نیست؛ لطفاً با UTF-8 یا فرمت اکسل (.xlsx) ذخیره کنید".into())
+            CoreError::Import("کدگذاری فایل CSV معتبر نیست؛ لطفاً با UTF-8 یا اکسل (.xlsx) ذخیره کنید".into())
         })?;
         import_csv_text(conn, &text, replace_existing)
     }
 }
 
-pub fn import_excel_bytes(
-    conn: &mut Connection,
-    bytes: &[u8],
-    replace_existing: bool,
-) -> Result<ImportReport, CoreError> {
+fn import_excel_bytes(conn: &mut Connection, bytes: &[u8], replace_existing: bool) -> Result<ImportReport, CoreError> {
     let cursor = Cursor::new(bytes);
     let mut workbook = open_workbook_auto_from_rs(cursor)
         .map_err(|e| CoreError::Import(format!("فایل اکسل قابل خواندن نیست: {e}")))?;
@@ -69,11 +65,7 @@ pub fn import_excel_bytes(
     persist_rows(conn, &rows_vec, replace_existing)
 }
 
-pub fn import_csv_text(
-    conn: &mut Connection,
-    csv_text: &str,
-    replace_existing: bool,
-) -> Result<ImportReport, CoreError> {
+fn import_csv_text(conn: &mut Connection, csv_text: &str, replace_existing: bool) -> Result<ImportReport, CoreError> {
     let cleaned = csv_text.trim_start_matches('\u{FEFF}');
     let first_non_empty = cleaned
         .lines()
@@ -83,10 +75,9 @@ pub fn import_csv_text(
     let delimiter = detect_csv_delimiter(first_non_empty);
     let mut rows_vec = Vec::new();
     for line in cleaned.lines() {
-        if line.trim().is_empty() {
-            continue;
+        if !line.trim().is_empty() {
+            rows_vec.push(parse_csv_line(line, delimiter));
         }
-        rows_vec.push(parse_csv_line(line, delimiter));
     }
     persist_rows(conn, &rows_vec, replace_existing)
 }
@@ -95,13 +86,9 @@ fn detect_csv_delimiter(sample: &str) -> char {
     let commas = sample.matches(',').count();
     let semicolons = sample.matches(';').count();
     let tabs = sample.matches('\t').count();
-    if semicolons > commas && semicolons >= tabs {
-        ';'
-    } else if tabs > commas && tabs > semicolons {
-        '\t'
-    } else {
-        ','
-    }
+    if semicolons > commas && semicolons >= tabs { ';' }
+    else if tabs > commas && tabs > semicolons { '\t' }
+    else { ',' }
 }
 
 fn parse_csv_line(line: &str, delimiter: char) -> Vec<String> {
@@ -112,15 +99,9 @@ fn parse_csv_line(line: &str, delimiter: char) -> Vec<String> {
     while let Some(c) = chars.next() {
         if in_quotes {
             if c == '"' {
-                if chars.peek() == Some(&'"') {
-                    chars.next();
-                    current.push('"');
-                } else {
-                    in_quotes = false;
-                }
-            } else {
-                current.push(c);
-            }
+                if chars.peek() == Some(&'"') { chars.next(); current.push('"'); }
+                else { in_quotes = false; }
+            } else { current.push(c); }
         } else if c == '"' {
             in_quotes = true;
         } else if c == delimiter {
@@ -138,58 +119,45 @@ fn cell_to_string(cell: &Data) -> String {
     match cell {
         Data::String(s) => s.trim().to_string(),
         Data::Int(i) => i.to_string(),
-        Data::Float(f) => {
-            if f.fract() == 0.0 { format!("{}", *f as i64) } else { f.to_string() }
-        }
+        Data::Float(f) => if f.fract() == 0.0 { format!("{}", *f as i64) } else { f.to_string() },
         Data::Bool(b) => b.to_string(),
         Data::DateTime(dt) => dt.as_f64().to_string(),
         _ => String::new(),
     }
 }
 
-fn persist_rows(
-    conn: &mut Connection,
-    raw_rows: &[Vec<String>],
-    replace_existing: bool,
-) -> Result<ImportReport, CoreError> {
+fn persist_rows(conn: &mut Connection, raw_rows: &[Vec<String>], replace_existing: bool) -> Result<ImportReport, CoreError> {
     if raw_rows.is_empty() {
         return Err(CoreError::Import("فایل خالی است".into()));
     }
-
     let first_norm: Vec<String> = raw_rows[0].iter().map(|c| normalize_persian(c)).collect();
-    let has_header = first_norm.iter().any(|c| {
-        c.contains("ردیف") || c.contains("نام خانوادگی") || c.contains("کد ملی")
-    });
+    let has_header = first_norm.iter().any(|c| c.contains("ردیف") || c.contains("نام خانوادگی") || c.contains("کد ملی"));
     let start_idx = if has_header { 1 } else { 0 };
 
     let mut students = Vec::with_capacity(raw_rows.len());
     let mut skipped = 0i32;
 
     for (idx, cols) in raw_rows[start_idx..].iter().enumerate() {
-        if cols.len() < 9 {
-            skipped += 1;
-            continue;
-        }
+        if cols.len() < 9 { skipped += 1; continue; }
         let row_num = normalize_persian(&cols[0]).parse::<i32>().unwrap_or((idx + 1) as i32);
-        let school_name = cols[1].trim().to_string();
-        let major = cols[2].trim().to_string();
+        let school_name = {
+            let s = cols[1].trim();
+            if s.is_empty() { "مدرسه".to_string() } else { s.to_string() }
+        };
         let grade = cols[3].trim().to_string();
-        let section = normalize_persian(&cols[4]).parse::<i32>().unwrap_or(1);
+        let major = if is_middle_grade(&grade) { String::new() } else { cols[2].trim().to_string() };
+        let section = normalize_persian(&cols[4]).parse::<i32>().unwrap_or(1).max(1);
         let first_name = cols[5].trim().to_string();
         let last_name = cols[6].trim().to_string();
         let father_name = cols[7].trim().to_string();
         let national_id = normalize_national_id(&cols[8]);
         let mobile = cols.get(9).map(|m| normalize_mobile(m)).unwrap_or_default();
 
-        if first_name.is_empty() || last_name.is_empty() || national_id.is_empty() {
+        if first_name.is_empty() || last_name.is_empty() || grade.is_empty() || national_id.is_empty() {
             skipped += 1;
             continue;
         }
-
-        let search_key = normalize_persian(&format!(
-            "{first_name} {last_name} {father_name} {national_id} {mobile}"
-        ));
-
+        let search_key = normalize_persian(&format!("{first_name} {last_name} {father_name} {national_id} {mobile}"));
         students.push(ParsedStudent {
             row_num, school_name, major, grade, section,
             first_name, last_name, father_name, national_id, mobile, search_key,
@@ -212,9 +180,8 @@ fn persist_rows(
                     row_num, school_name, major, grade, section,
                     first_name, last_name, father_name, national_id, mobile, search_key
                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-                ON CONFLICT(national_id) DO UPDATE SET
+                ON CONFLICT(school_name, national_id) DO UPDATE SET
                     row_num = excluded.row_num,
-                    school_name = excluded.school_name,
                     major = excluded.major,
                     grade = excluded.grade,
                     section = excluded.section,
@@ -236,18 +203,9 @@ fn persist_rows(
     }
 
     let classes_count: i32 = tx
-        .query_row(
-            "SELECT COUNT(*) FROM (SELECT DISTINCT major, grade, section FROM students)",
-            [],
-            |r| r.get(0),
-        )
+        .query_row("SELECT COUNT(*) FROM (SELECT DISTINCT school_name, major, grade, section FROM students)", [], |r| r.get(0))
         .map_err(|e| CoreError::Database(e.to_string()))?;
-
     tx.commit().map_err(|e| CoreError::Database(e.to_string()))?;
 
-    Ok(ImportReport {
-        imported_count: students.len() as i32,
-        skipped_count: skipped,
-        classes_count,
-    })
+    Ok(ImportReport { imported_count: students.len() as i32, skipped_count: skipped, classes_count })
 }
