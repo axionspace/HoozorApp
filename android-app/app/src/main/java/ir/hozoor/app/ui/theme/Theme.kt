@@ -17,38 +17,52 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 
 object StatusColors {
-    val Present = Color(0xFF1B8A5A)
-    val PresentContainer = Color(0xFFD7F5E6)
-    val Absent = Color(0xFFD93848)
-    val AbsentContainer = Color(0xFFFFDADF)
-    val Late = Color(0xFFC87A00)
-    val LateContainer = Color(0xFFFFECC7)
-    val Excused = Color(0xFF3367D6)
-    val ExcusedContainer = Color(0xFFDCE7FF)
+    val Present = Color(0xFF15803D)
+    val OnPresent = Color.White
+
+    val Absent = Color(0xFFC62828)
+    val OnAbsent = Color.White
+
+    val Late = Color(0xFFEAB308)
+    val OnLate = Color(0xFF1A1A1A)
+
+    val Excused = Color(0xFF2563EB)
+    val OnExcused = Color.White
+
     val Unmarked = Color(0xFF757982)
 }
 
 private val ExpressiveDarkFallback = darkColorScheme(
-    primary = Color(0xFF8CD3FF),
-    onPrimary = Color(0xFF00344C),
-    primaryContainer = Color(0xFF004C6D),
-    secondary = Color(0xFFB5CCDD),
-    tertiary = Color(0xFFD9BDFE),
-    background = Color(0xFF101418),
-    surface = Color(0xFF101418),
-    surfaceContainerHigh = Color(0xFF1E252B)
+    primary = Color(0xFF4ADE80),
+    onPrimary = Color(0xFF00391A),
+    primaryContainer = Color(0xFF0F5132),
+    onPrimaryContainer = Color(0xFFC2F7D4),
+    secondary = Color(0xFF93C5FD),
+    onSecondary = Color(0xFF003063),
+    secondaryContainer = Color(0xFF1E3A5F),
+    onSecondaryContainer = Color(0xFFD6E7FF),
+    tertiary = Color(0xFFD8B4FE),
+    onTertiary = Color(0xFF3B0764),
+    tertiaryContainer = Color(0xFF4C1D95),
+    onTertiaryContainer = Color(0xFFF3E8FF),
+    background = Color(0xFF0F1412),
+    surface = Color(0xFF0F1412),
+    surfaceContainerLow = Color(0xFF171E1B),
+    surfaceContainer = Color(0xFF1C2420),
+    surfaceContainerHigh = Color(0xFF242E2A)
 )
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun HozoorExpressiveTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
     reduceMotion: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
     val colorScheme = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         darkTheme -> ExpressiveDarkFallback

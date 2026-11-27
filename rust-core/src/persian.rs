@@ -1,3 +1,5 @@
+use crate::models::{JalaliDayCell, JalaliMonthGrid};
+
 pub fn normalize_persian(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for ch in input.trim().chars() {
@@ -99,7 +101,7 @@ pub fn normalize_national_id(raw: &str) -> String {
     if digits.len() < 10 {
         format!("{:0>10}", digits)
     } else {
-        digits
+        digits.chars().take(10).collect()
     }
 }
 
@@ -119,11 +121,24 @@ pub fn normalize_mobile(raw: &str) -> String {
 
 pub fn grade_rank(grade: &str) -> i32 {
     match normalize_persian(grade).as_str() {
+        "اول" => 1,
+        "دوم" => 2,
+        "سوم" => 3,
+        "چهارم" => 4,
+        "پنجم" => 5,
+        "ششم" => 6,
+        "هفتم" => 7,
+        "هشتم" => 8,
+        "نهم" => 9,
         "دهم" => 10,
         "یازدهم" => 11,
         "دوازدهم" => 12,
         _ => 99,
     }
+}
+
+pub fn is_middle_grade(grade: &str) -> bool {
+    matches!(normalize_persian(grade).as_str(), "هفتم" | "هشتم" | "نهم")
 }
 
 pub fn format_iso_to_jalali(date_iso: &str) -> String {
@@ -265,12 +280,41 @@ pub fn format_jalali_month_label(jy: i32, jm: u32) -> String {
     to_persian_digits(&format!("{} {}", month_name_fa(jm), jy))
 }
 
-fn weekday_fa(y: i32, m: u32, d: u32) -> &'static str {
-    const WEEKDAYS: [&str; 7] = ["یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"];
+pub fn build_jalali_month_grid(jy: i32, jm_i32: i32) -> JalaliMonthGrid {
+    let jm = jm_i32.clamp(1, 12) as u32;
+    let total_days = jalali_month_days(jy, jm);
+    let (fy, fm, fd) = jalali_to_gregorian(jy, jm, 1);
+    let first_fa_wd = (sunday_based_weekday(fy, fm, fd) + 1) % 7;
+
+    let mut days = Vec::with_capacity(total_days as usize);
+    for d in 1..=total_days {
+        let (gy, gm, gd) = jalali_to_gregorian(jy, jm, d);
+        let fa_wd = (sunday_based_weekday(gy, gm, gd) + 1) % 7;
+        days.push(JalaliDayCell {
+            day: d as i32,
+            date_iso: format!("{gy:04}-{gm:02}-{gd:02}"),
+            is_friday: fa_wd == 6,
+        });
+    }
+
+    JalaliMonthGrid {
+        year: jy,
+        month: jm as i32,
+        month_label: format_jalali_month_label(jy, jm),
+        leading_blanks: first_fa_wd as i32,
+        days,
+    }
+}
+
+fn sunday_based_weekday(y: i32, m: u32, d: u32) -> usize {
     let t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
     let y = if m < 3 { y - 1 } else { y };
-    let idx = (y + y / 4 - y / 100 + y / 400 + t[(m - 1) as usize] + d as i32).rem_euclid(7);
-    WEEKDAYS[idx as usize]
+    (y + y / 4 - y / 100 + y / 400 + t[(m - 1) as usize] + d as i32).rem_euclid(7) as usize
+}
+
+fn weekday_fa(y: i32, m: u32, d: u32) -> &'static str {
+    const WEEKDAYS: [&str; 7] = ["یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"];
+    WEEKDAYS[sunday_based_weekday(y, m, d)]
 }
 
 pub fn month_name_fa(m: u32) -> &'static str {

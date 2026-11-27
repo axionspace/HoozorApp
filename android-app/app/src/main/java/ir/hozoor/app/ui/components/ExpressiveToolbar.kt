@@ -3,6 +3,7 @@ package ir.hozoor.app.ui.components
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DoneAll
+import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -18,8 +19,9 @@ import uniffi.hozoor_core.Period
 @Composable
 fun ExpressiveAttendanceToolbar(
     selectedPeriod: Period,
-    onMarkRemainingPresent: () -> Unit,
+    onResetAllPresent: () -> Unit,
     onCopyFromPrevious: () -> Unit,
+    onAddStudent: () -> Unit,
     onOpenExportSheet: () -> Unit,
     onImportFile: () -> Unit,
     modifier: Modifier = Modifier
@@ -34,14 +36,17 @@ fun ExpressiveAttendanceToolbar(
             }
         }
     ) {
-        IconButton(onClick = onMarkRemainingPresent) {
-            Icon(Icons.Rounded.DoneAll, contentDescription = "حاضر کردن بقیه")
+        IconButton(onClick = onResetAllPresent) {
+            Icon(Icons.Rounded.DoneAll, contentDescription = "همه حاضر")
         }
         IconButton(onClick = onCopyFromPrevious, enabled = selectedPeriod != Period.FIRST) {
             Icon(Icons.Rounded.ContentCopy, contentDescription = "کپی از زنگ قبل")
         }
+        IconButton(onClick = onAddStudent) {
+            Icon(Icons.Rounded.PersonAdd, contentDescription = "افزودن دانش‌آموز")
+        }
         IconButton(onClick = onOpenExportSheet) {
-            Icon(Icons.Rounded.Share, contentDescription = "گزارش مدیر و خروجی")
+            Icon(Icons.Rounded.Share, contentDescription = "گزارش مدیر، خروجی و پشتیبان")
         }
     }
 }

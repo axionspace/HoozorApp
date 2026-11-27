@@ -12,7 +12,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uniffi.hozoor_core.AttendanceEngine
 import uniffi.hozoor_core.AttendanceStatus
+import uniffi.hozoor_core.ClassAnalytics
 import uniffi.hozoor_core.ClassGroup
+import uniffi.hozoor_core.JalaliMonthGrid
 import uniffi.hozoor_core.MonthlyClassReport
 import uniffi.hozoor_core.Period
 import uniffi.hozoor_core.PeriodSummary
@@ -24,16 +26,30 @@ import java.time.LocalDate
 data class AttendanceUiState(
     val isLoading: Boolean = true,
     val activeTab: Int = 0,
-    val schoolName: String = "هنرستان شهید آوینی",
+    val themeMode: String = "system",
+    val dynamicColorEnabled: Boolean = true,
     val classes: List<ClassGroup> = emptyList(),
+    val schools: List<String> = emptyList(),
+    val selectedSchool: String = "",
+    val majorsForSchool: List<String> = emptyList(),
+    val selectedMajor: String = "",
+    val gradesForSelection: List<String> = emptyList(),
+    val selectedGrade: String = "",
+    val sectionsForSelection: List<Int> = emptyList(),
+    val selectedSection: Int = 1,
     val selectedClass: ClassGroup? = null,
     val selectedDate: LocalDate = LocalDate.now(),
     val jalaliDate: String = "",
     val selectedPeriod: Period = Period.FIRST,
+    val classTime: String = "08:00",
+    val teacherName: String = "",
+    val lessonName: String = "",
+    val principalPhone: String = "",
     val searchQuery: String = "",
+    val isPeriodSaved: Boolean = false,
     val students: List<StudentAttendanceRow> = emptyList(),
     val summary: PeriodSummary = PeriodSummary(0, 0, 0, 0, 0, 0),
-    val principalPhone: String = "",
+    val classAnalytics: ClassAnalytics? = null,
     val principalReport: PrincipalReportBundle? = null,
     val reportWholeSchool: Boolean = false,
     val monthlyYear: Int = 1404,
@@ -50,11 +66,23 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
 
     init {
         viewModelScope.launch {
-            val savedPhone = withContext(Dispatchers.IO) { engine.getPrincipalPhone() }
+            val settings = withContext(Dispatchers.IO) {
+                mapOf(
+                    "teacher" to engine.getSetting("teacher_name"),
+                    "lesson" to engine.getSetting("lesson_name"),
+                    "phone" to engine.getSetting("principal_phone"),
+                    "theme" to engine.getSetting("theme_mode").ifBlank { "system" },
+                    "dynamic" to engine.getSetting("dynamic_color").ifBlank { "true" }
+                )
+            }
             val ym = engine.getJalaliYearMonth(LocalDate.now().toString())
             _uiState.update {
                 it.copy(
-                    principalPhone = savedPhone,
+                    teacherName = settings["teacher"].orEmpty(),
+                    lessonName = settings["lesson"].orEmpty(),
+                    principalPhone = settings["phone"].orEmpty(),
+                    themeMode = settings["theme"] ?: "system",
+                    dynamicColorEnabled = settings["dynamic"] != "false",
                     monthlyYear = ym.year,
                     monthlyMonth = ym.month
                 )
@@ -63,51 +91,174 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         }
     }
 
+    fun toggleDarkMode(currentlyDark: Boolean) {
+        val next = if (currentlyDark) "light" else "dark"
+        _uiState.update { it.copy(themeMode = next) }
+        viewModelScope.launch(Dispatchers.IO) { engine.setSetting("theme_mode", next) }
+    }
+
+    fun toggleDynamicColor() {
+        val next = !_uiState.value.dynamicColorEnabled
+        _uiState.update { it.copy(dynamicColorEnabled = next) }
+        viewModelScope.launch(Dispatchers.IO) { engine.setSetting("dynamic_color", next.toString()) }
+        showMessage(if (next) "رنگ پویا (Dynamic Color) فعال شد" else "تم استاندارد Material Expressive فعال شد")
+    }
+
+    fun updateTeacherName(value: String) {
+        _uiState.update { it.copy(teacherName = value) }
+        viewModelScope.launch(Dispatchers.IO) { engine.setSetting("teacher_name", value) }
+    }
+
+    fun updateLessonName(value: String) {
+        _uiState.update { it.copy(lessonName = value) }
+        viewModelScope.launch(Dispatchers.IO) { engine.setSetting("lesson_name", value) }
+    }
+
+    fun updatePrincipalPhone(value: String) {
+        _uiState.update { it.copy(principalPhone = value) }
+        viewModelScope.launch(Dispatchers.IO) { engine.setSetting("principal_phone", value) }
+    }
+
+    fun updateClassTime(value: String) {
+        _uiState.update { it.copy(classTime = value) }
+    }
+
     fun switchTab(tabIndex: Int) {
         _uiState.update { it.copy(activeTab = tabIndex) }
-        if (tabIndex == 1) loadMonthlyReport()
+        if (tabIndex == 1) loadAnalyticsAndMonthly()
     }
 
     fun refreshClassesAndData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val classes = withContext(Dispatchers.IO) { engine.getClasses() }
-            val currentSelected = _uiState.value.selectedClass
-            val activeClass = classes.find {
-                it.major == currentSelected?.major &&
-                    it.grade == currentSelected?.grade &&
-                    it.section == currentSelected?.section
-            } ?: classes.firstOrNull()
+            val allClasses = withContext(Dispatchers.IO) { engine.getClasses() }
+            resolveCategorySelection(
+                allClasses = allClasses,
+                wantedSchool = _uiState.value.selectedSchool,
+                wantedMajor = _uiState.value.selectedMajor,
+                wantedGrade = _uiState.value.selectedGrade,
+                wantedSection = _uiState.value.selectedSection
+            )
+            loadAttendanceSnapshot()
+            if (_uiState.value.activeTab == 1) loadAnalyticsAndMonthly()
+        }
+    }
 
+    fun selectSchool(school: String) {
+        resolveCategorySelection(_uiState.value.classes, school, "", "", 1)
+        loadAttendanceSnapshot()
+        if (_uiState.value.activeTab == 1) loadAnalyticsAndMonthly()
+    }
+
+    fun selectMajor(major: String) {
+        val st = _uiState.value
+        resolveCategorySelection(st.classes, st.selectedSchool, major, st.selectedGrade, st.selectedSection)
+        loadAttendanceSnapshot()
+        if (st.activeTab == 1) loadAnalyticsAndMonthly()
+    }
+
+    fun selectGrade(grade: String) {
+        val st = _uiState.value
+        resolveCategorySelection(st.classes, st.selectedSchool, st.selectedMajor, grade, st.selectedSection)
+        loadAttendanceSnapshot()
+        if (st.activeTab == 1) loadAnalyticsAndMonthly()
+    }
+
+    fun selectSection(section: Int) {
+        val st = _uiState.value
+        resolveCategorySelection(st.classes, st.selectedSchool, st.selectedMajor, st.selectedGrade, section)
+        loadAttendanceSnapshot()
+        if (st.activeTab == 1) loadAnalyticsAndMonthly()
+    }
+
+    private fun resolveCategorySelection(
+        allClasses: List<ClassGroup>,
+        wantedSchool: String,
+        wantedMajor: String,
+        wantedGrade: String,
+        wantedSection: Int
+    ) {
+        if (allClasses.isEmpty()) {
             _uiState.update {
                 it.copy(
-                    classes = classes,
-                    selectedClass = activeClass,
-                    schoolName = activeClass?.schoolName ?: it.schoolName,
+                    classes = emptyList(),
+                    schools = emptyList(),
+                    selectedSchool = "",
+                    majorsForSchool = emptyList(),
+                    selectedMajor = "",
+                    gradesForSelection = emptyList(),
+                    selectedGrade = "",
+                    sectionsForSelection = emptyList(),
+                    selectedSection = 1,
+                    selectedClass = null,
                     jalaliDate = engine.formatJalaliDate(it.selectedDate.toString())
                 )
             }
-            loadAttendanceSnapshot()
-            if (_uiState.value.activeTab == 1) loadMonthlyReport()
+            return
+        }
+
+        val schools = allClasses.map { it.schoolName }.distinct()
+        val school = if (wantedSchool in schools) wantedSchool else schools.first()
+        val inSchool = allClasses.filter { it.schoolName == school }
+
+        val majors = inSchool.map { it.major }.filter { it.isNotBlank() }.distinct()
+        val major = when {
+            majors.isEmpty() -> ""
+            wantedMajor in majors -> wantedMajor
+            else -> majors.first()
+        }
+        val inMajor = if (majors.isEmpty()) inSchool else inSchool.filter { it.major == major }
+
+        val grades = inMajor.map { it.grade }.distinct()
+        val grade = if (wantedGrade in grades) wantedGrade else grades.first()
+        val inGrade = inMajor.filter { it.grade == grade }
+
+        val sections = inGrade.map { it.section }.distinct().sorted()
+        val section = if (wantedSection in sections) wantedSection else sections.first()
+        val selectedClass = inGrade.find { it.section == section } ?: inGrade.firstOrNull()
+
+        _uiState.update {
+            it.copy(
+                classes = allClasses,
+                schools = schools,
+                selectedSchool = school,
+                majorsForSchool = majors,
+                selectedMajor = major,
+                gradesForSelection = grades,
+                selectedGrade = grade,
+                sectionsForSelection = sections,
+                selectedSection = section,
+                selectedClass = selectedClass
+            )
         }
     }
 
     fun selectPeriod(period: Period) {
-        if (_uiState.value.selectedPeriod == period) return
-        _uiState.update { it.copy(selectedPeriod = period) }
+        val defaultTime = when (period) {
+            Period.FIRST -> "08:00"
+            Period.SECOND -> "09:00"
+            Period.THIRD -> "10:00"
+            Period.FOURTH -> "11:00"
+        }
+        _uiState.update { it.copy(selectedPeriod = period, classTime = defaultTime) }
         loadAttendanceSnapshot()
     }
 
-    fun selectClass(group: ClassGroup) {
-        _uiState.update { it.copy(selectedClass = group, schoolName = group.schoolName) }
-        loadAttendanceSnapshot()
-        if (_uiState.value.activeTab == 1) loadMonthlyReport()
+    fun selectDateIso(dateIso: String) {
+        runCatching { LocalDate.parse(dateIso) }.onSuccess { date ->
+            _uiState.update { it.copy(selectedDate = date) }
+            loadAttendanceSnapshot()
+        }
     }
 
     fun shiftDate(days: Long) {
         _uiState.update { it.copy(selectedDate = it.selectedDate.plusDays(days)) }
         loadAttendanceSnapshot()
     }
+
+    fun getJalaliCalendarGrid(year: Int, month: Int): JalaliMonthGrid = engine.getJalaliMonthGrid(year, month)
+
+    fun currentDateJalaliYearMonth() = engine.getJalaliYearMonth(_uiState.value.selectedDate.toString())
 
     fun shiftJalaliMonth(delta: Int) {
         val cur = _uiState.value
@@ -116,7 +267,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         if (m > 12) { m = 1; y += 1 }
         if (m < 1) { m = 12; y -= 1 }
         _uiState.update { it.copy(monthlyYear = y, monthlyMonth = m) }
-        loadMonthlyReport()
+        loadAnalyticsAndMonthly()
     }
 
     fun toggleMonthlySort() {
@@ -129,47 +280,113 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
     }
 
     fun setStudentStatus(studentId: Long, status: AttendanceStatus) {
-        val state = _uiState.value
+        val st = _uiState.value
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                engine.setAttendance(studentId, state.selectedDate.toString(), state.selectedPeriod, status, "")
+                engine.setAttendance(
+                    studentId = studentId,
+                    dateIso = st.selectedDate.toString(),
+                    period = st.selectedPeriod,
+                    status = status,
+                    note = "",
+                    teacherName = st.teacherName,
+                    lessonName = st.lessonName,
+                    classTime = st.classTime
+                )
             }
             loadAttendanceSnapshot()
         }
     }
 
-    fun markRemainingPresent() {
-        val state = _uiState.value
-        val group = state.selectedClass ?: return
+    /** دکمه دوتا تیک: کل دانش‌آموزان کلاس را (حتی غایب‌ها و تأخیری‌ها) دوباره به «حاضر» برمی‌گرداند */
+    fun resetAllToPresent() {
+        val st = _uiState.value
+        val cls = st.selectedClass ?: return
         viewModelScope.launch {
             val count = withContext(Dispatchers.IO) {
                 engine.markClassStatus(
-                    group.major, group.grade, group.section,
-                    state.selectedDate.toString(), state.selectedPeriod,
-                    AttendanceStatus.PRESENT, true
+                    schoolName = cls.schoolName,
+                    major = cls.major,
+                    grade = cls.grade,
+                    section = cls.section,
+                    dateIso = st.selectedDate.toString(),
+                    period = st.selectedPeriod,
+                    status = AttendanceStatus.PRESENT,
+                    onlyUnmarked = false,
+                    teacherName = st.teacherName,
+                    lessonName = st.lessonName,
+                    classTime = st.classTime
                 )
             }
             loadAttendanceSnapshot()
-            showMessage("وضعیت حاضر برای $count دانش‌آموز ثبت شد")
+            showMessage("همه $count دانش‌آموز به حالت حاضر درآمدند و ثبت شدند")
         }
     }
 
     fun copyFromPreviousPeriod() {
-        val state = _uiState.value
-        val group = state.selectedClass ?: return
-        if (state.selectedPeriod == Period.FIRST) {
+        val st = _uiState.value
+        val cls = st.selectedClass ?: return
+        if (st.selectedPeriod == Period.FIRST) {
             showMessage("زنگ اول، زنگ قبلی ندارد")
             return
         }
         viewModelScope.launch {
             val copied = withContext(Dispatchers.IO) {
                 engine.copyFromPreviousPeriod(
-                    group.major, group.grade, group.section,
-                    state.selectedDate.toString(), state.selectedPeriod
+                    cls.schoolName, cls.major, cls.grade, cls.section,
+                    st.selectedDate.toString(), st.selectedPeriod
                 )
             }
             loadAttendanceSnapshot()
-            showMessage(if (copied > 0) "وضعیت $copied نفر از زنگ قبل کپی شد" else "در زنگ قبل موردی ثبت نشده است")
+            showMessage(if (copied > 0) "حضور و غیاب $copied نفر از زنگ قبل کپی شد" else "در زنگ قبل موردی ثبت نشده است")
+        }
+    }
+
+    fun addStudentToCurrentClass(first: String, last: String, father: String, nationalId: String, mobile: String) {
+        val cls = _uiState.value.selectedClass ?: return
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    engine.addStudent(cls.schoolName, cls.major, cls.grade, cls.section, first, last, father, nationalId, mobile)
+                }
+                refreshClassesAndData()
+                showMessage("دانش‌آموز به کلاس اضافه شد")
+            } catch (e: Exception) {
+                showMessage(e.message ?: "خطا در افزودن دانش‌آموز")
+            }
+        }
+    }
+
+    fun updateStudent(studentId: Long, first: String, last: String, father: String, nationalId: String, mobile: String) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    engine.updateStudent(studentId, first, last, father, nationalId, mobile)
+                }
+                loadAttendanceSnapshot()
+                showMessage("اطلاعات دانش‌آموز به‌روزرسانی شد")
+            } catch (e: Exception) {
+                showMessage(e.message ?: "خطا در ویرایش دانش‌آموز")
+            }
+        }
+    }
+
+    fun deleteStudent(studentId: Long) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { engine.deleteStudent(studentId) }
+            refreshClassesAndData()
+            showMessage("دانش‌آموز و سوابق او حذف شد")
+        }
+    }
+
+    fun deleteCurrentClass() {
+        val cls = _uiState.value.selectedClass ?: return
+        viewModelScope.launch {
+            val count = withContext(Dispatchers.IO) {
+                engine.deleteClass(cls.schoolName, cls.major, cls.grade, cls.section)
+            }
+            refreshClassesAndData()
+            showMessage("کلاس و $count دانش‌آموز آن حذف شدند")
         }
     }
 
@@ -177,9 +394,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val report = withContext(Dispatchers.IO) {
-                    engine.importFileBytes(fileName, bytes, replaceExisting)
-                }
+                val report = withContext(Dispatchers.IO) { engine.importFileBytes(fileName, bytes, replaceExisting) }
                 refreshClassesAndData()
                 showMessage("${report.importedCount} دانش‌آموز در ${report.classesCount} کلاس وارد شد")
             } catch (e: Exception) {
@@ -189,68 +404,111 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         }
     }
 
+    fun restoreBackupJson(jsonText: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val rep = withContext(Dispatchers.IO) { engine.restoreBackupJson(jsonText) }
+                refreshClassesAndData()
+                showMessage("پشتیبان بازیابی شد: ${rep.importedCount} دانش‌آموز در ${rep.classesCount} کلاس")
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false) }
+                showMessage(e.message ?: "فایل پشتیبان معتبر نیست")
+            }
+        }
+    }
+
+    fun exportBackupJson(onReady: (String, ByteArray) -> Unit) {
+        val st = _uiState.value
+        viewModelScope.launch {
+            val json = withContext(Dispatchers.IO) { engine.exportBackupJson() }
+            onReady("hozoor_backup_${st.selectedDate}.json", json.toByteArray(Charsets.UTF_8))
+        }
+    }
+
+    fun exportTemplateExcel(onReady: (String, ByteArray) -> Unit) {
+        viewModelScope.launch {
+            val bytes = withContext(Dispatchers.IO) { engine.exportTemplateXlsx() }
+            onReady("نمونه_ورود_دانش_آموزان.xlsx", bytes)
+        }
+    }
+
+    fun generatePeriodGroupMessage(targetStatus: AttendanceStatus, onReady: (String) -> Unit) {
+        val st = _uiState.value
+        val cls = st.selectedClass ?: return
+        viewModelScope.launch {
+            try {
+                val msg = withContext(Dispatchers.IO) {
+                    engine.generatePeriodGroupMessage(
+                        cls.schoolName, cls.major, cls.grade, cls.section,
+                        st.selectedDate.toString(), st.selectedPeriod, targetStatus,
+                        st.teacherName, st.lessonName
+                    )
+                }
+                onReady(msg)
+            } catch (e: Exception) {
+                showMessage(e.message ?: "موردی یافت نشد")
+            }
+        }
+    }
+
     fun preparePrincipalReport(wholeSchool: Boolean = _uiState.value.reportWholeSchool) {
-        val state = _uiState.value
-        val cls = state.selectedClass ?: return
+        val st = _uiState.value
+        val cls = st.selectedClass ?: return
         _uiState.update { it.copy(reportWholeSchool = wholeSchool) }
         viewModelScope.launch {
             val bundle = withContext(Dispatchers.IO) {
-                engine.generatePrincipalReport(cls.major, cls.grade, cls.section, state.selectedDate.toString(), wholeSchool)
+                engine.generatePrincipalReport(
+                    cls.schoolName, cls.major, cls.grade, cls.section,
+                    st.selectedDate.toString(), wholeSchool, st.teacherName
+                )
             }
             _uiState.update { it.copy(principalReport = bundle) }
         }
     }
 
-    fun updatePrincipalPhone(phone: String) {
-        _uiState.update { it.copy(principalPhone = phone) }
-        viewModelScope.launch(Dispatchers.IO) { engine.savePrincipalPhone(phone) }
-    }
-
     fun exportDailyExcel(wholeSchool: Boolean, onReady: (String, ByteArray) -> Unit) {
-        val state = _uiState.value
-        val cls = state.selectedClass ?: return
+        val st = _uiState.value
+        val cls = st.selectedClass ?: return
         viewModelScope.launch {
             val bytes = withContext(Dispatchers.IO) {
-                engine.exportDailyXlsx(cls.major, cls.grade, cls.section, state.selectedDate.toString(), wholeSchool)
+                engine.exportDailyXlsx(cls.schoolName, cls.major, cls.grade, cls.section, st.selectedDate.toString(), wholeSchool)
             }
-            val prefix = if (wholeSchool) "hozoor_school" else "hozoor_${cls.major}_${cls.grade}_${cls.section}"
-            onReady("${prefix}_${state.selectedDate}.xlsx", bytes)
+            val prefix = if (wholeSchool) "hozoor_school" else "hozoor_${cls.grade}_${cls.section}"
+            onReady("${prefix}_${st.selectedDate}.xlsx", bytes)
         }
     }
 
     fun exportCurrentClassCsv(onReady: (String, ByteArray) -> Unit) {
-        val state = _uiState.value
-        val cls = state.selectedClass ?: return
+        val st = _uiState.value
+        val cls = st.selectedClass ?: return
         viewModelScope.launch {
             val csv = withContext(Dispatchers.IO) {
-                engine.exportDailyCsv(cls.major, cls.grade, cls.section, state.selectedDate.toString())
+                engine.exportDailyCsv(cls.schoolName, cls.major, cls.grade, cls.section, st.selectedDate.toString())
             }
-            onReady("hozoor_${cls.major}_${cls.grade}_${cls.section}_${state.selectedDate}.csv", csv.toByteArray(Charsets.UTF_8))
+            onReady("hozoor_${cls.grade}_${cls.section}_${st.selectedDate}.csv", csv.toByteArray(Charsets.UTF_8))
         }
     }
 
     fun exportMonthlyExcel(onReady: (String, ByteArray) -> Unit) {
-        val state = _uiState.value
-        val cls = state.selectedClass ?: return
+        val st = _uiState.value
+        val cls = st.selectedClass ?: return
         viewModelScope.launch {
             val bytes = withContext(Dispatchers.IO) {
-                engine.exportMonthlyXlsx(cls.major, cls.grade, cls.section, state.monthlyYear, state.monthlyMonth)
+                engine.exportMonthlyXlsx(cls.schoolName, cls.major, cls.grade, cls.section, st.monthlyYear, st.monthlyMonth)
             }
-            onReady("monthly_${cls.major}_${cls.grade}_${cls.section}_${state.monthlyYear}_${state.monthlyMonth}.xlsx", bytes)
+            onReady("monthly_${cls.grade}_${cls.section}_${st.monthlyYear}_${st.monthlyMonth}.xlsx", bytes)
         }
     }
 
     fun exportMonthlyCsv(onReady: (String, ByteArray) -> Unit) {
-        val state = _uiState.value
-        val cls = state.selectedClass ?: return
+        val st = _uiState.value
+        val cls = st.selectedClass ?: return
         viewModelScope.launch {
             val csv = withContext(Dispatchers.IO) {
-                engine.exportMonthlyCsv(cls.major, cls.grade, cls.section, state.monthlyYear, state.monthlyMonth)
+                engine.exportMonthlyCsv(cls.schoolName, cls.major, cls.grade, cls.section, st.monthlyYear, st.monthlyMonth)
             }
-            onReady(
-                "monthly_${cls.major}_${cls.grade}_${cls.section}_${state.monthlyYear}_${state.monthlyMonth}.csv",
-                csv.toByteArray(Charsets.UTF_8)
-            )
+            onReady("monthly_${cls.grade}_${cls.section}_${st.monthlyYear}_${st.monthlyMonth}.csv", csv.toByteArray(Charsets.UTF_8))
         }
     }
 
@@ -262,27 +520,29 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         _uiState.update { it.copy(snackbarMessage = null) }
     }
 
-    private fun loadMonthlyReport() {
-        val state = _uiState.value
-        val cls = state.selectedClass ?: return
+    private fun loadAnalyticsAndMonthly() {
+        val st = _uiState.value
+        val cls = st.selectedClass ?: return
         viewModelScope.launch {
-            val report = withContext(Dispatchers.IO) {
-                engine.getMonthlyReport(cls.major, cls.grade, cls.section, state.monthlyYear, state.monthlyMonth)
+            val (analytics, monthly) = withContext(Dispatchers.IO) {
+                engine.getClassAnalytics(cls.schoolName, cls.major, cls.grade, cls.section) to
+                    engine.getMonthlyReport(cls.schoolName, cls.major, cls.grade, cls.section, st.monthlyYear, st.monthlyMonth)
             }
-            _uiState.update { it.copy(monthlyReport = report) }
+            _uiState.update { it.copy(classAnalytics = analytics, monthlyReport = monthly) }
         }
     }
 
     private fun loadAttendanceSnapshot() {
-        val state = _uiState.value
-        val group = state.selectedClass
-        if (group == null) {
+        val st = _uiState.value
+        val cls = st.selectedClass
+        if (cls == null) {
             _uiState.update {
                 it.copy(
                     isLoading = false,
                     students = emptyList(),
+                    isPeriodSaved = false,
                     summary = PeriodSummary(0, 0, 0, 0, 0, 0),
-                    jalaliDate = engine.formatJalaliDate(state.selectedDate.toString())
+                    jalaliDate = engine.formatJalaliDate(st.selectedDate.toString())
                 )
             }
             return
@@ -290,14 +550,15 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         viewModelScope.launch {
             val snap = withContext(Dispatchers.IO) {
                 engine.getClassAttendance(
-                    group.major, group.grade, group.section,
-                    state.selectedDate.toString(), state.selectedPeriod, state.searchQuery
+                    cls.schoolName, cls.major, cls.grade, cls.section,
+                    st.selectedDate.toString(), st.selectedPeriod, st.searchQuery
                 )
             }
             _uiState.update {
                 it.copy(
                     isLoading = false,
                     jalaliDate = snap.jalaliDate,
+                    isPeriodSaved = snap.isPeriodSaved,
                     summary = snap.summary,
                     students = snap.students
                 )
