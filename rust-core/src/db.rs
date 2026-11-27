@@ -241,8 +241,9 @@ pub fn delete_class(conn: &Connection, major: &str, grade: &str, section: i32) -
 // ===== دفتر نمره (مستمر ماهانه / پودمانی / دلخواه) =====
 pub fn get_grade_categories(conn: &Connection) -> Result<Vec<GradeCategory>, CoreError> {
     let mut st = conn.prepare_cached("SELECT id, name FROM grade_categories ORDER BY sort_order ASC, id ASC").map_err(|e| CoreError::Database(e.to_string()))?;
-    st.query_map([], |r| Ok(GradeCategory { id: r.get(0)?, name: r.get(1)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))
+    let rows = st.query_map([], |r| Ok(GradeCategory { id: r.get(0)?, name: r.get(1)? }))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    Ok(rows)
 }
 
 pub fn add_grade_category(conn: &Connection, name: &str) -> Result<i64, CoreError> {
@@ -284,8 +285,9 @@ pub fn set_student_grade(conn: &Connection, student_id: i64, category_id: i64, s
 // ===== مخاطبین ذخیره‌شده (مدیر، معاون، مشاور...) =====
 pub fn get_saved_contacts(conn: &Connection) -> Result<Vec<SavedContact>, CoreError> {
     let mut st = conn.prepare_cached("SELECT id, name, role, phone FROM saved_contacts ORDER BY id ASC").map_err(|e| CoreError::Database(e.to_string()))?;
-    st.query_map([], |r| Ok(SavedContact { id: r.get(0)?, name: r.get(1)?, role: r.get(2)?, phone: r.get(3)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))
+    let rows = st.query_map([], |r| Ok(SavedContact { id: r.get(0)?, name: r.get(1)?, role: r.get(2)?, phone: r.get(3)? }))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    Ok(rows)
 }
 
 pub fn save_contact(conn: &Connection, name: &str, role: &str, phone: &str) -> Result<i64, CoreError> {

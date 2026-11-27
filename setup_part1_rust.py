@@ -659,8 +659,9 @@ pub fn delete_class(conn: &Connection, major: &str, grade: &str, section: i32) -
 // ===== دفتر نمره (مستمر ماهانه / پودمانی / دلخواه) =====
 pub fn get_grade_categories(conn: &Connection) -> Result<Vec<GradeCategory>, CoreError> {
     let mut st = conn.prepare_cached("SELECT id, name FROM grade_categories ORDER BY sort_order ASC, id ASC").map_err(|e| CoreError::Database(e.to_string()))?;
-    st.query_map([], |r| Ok(GradeCategory { id: r.get(0)?, name: r.get(1)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))
+    let rows = st.query_map([], |r| Ok(GradeCategory { id: r.get(0)?, name: r.get(1)? }))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    Ok(rows)
 }
 
 pub fn add_grade_category(conn: &Connection, name: &str) -> Result<i64, CoreError> {
@@ -702,8 +703,9 @@ pub fn set_student_grade(conn: &Connection, student_id: i64, category_id: i64, s
 // ===== مخاطبین ذخیره‌شده (مدیر، معاون، مشاور...) =====
 pub fn get_saved_contacts(conn: &Connection) -> Result<Vec<SavedContact>, CoreError> {
     let mut st = conn.prepare_cached("SELECT id, name, role, phone FROM saved_contacts ORDER BY id ASC").map_err(|e| CoreError::Database(e.to_string()))?;
-    st.query_map([], |r| Ok(SavedContact { id: r.get(0)?, name: r.get(1)?, role: r.get(2)?, phone: r.get(3)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))
+    let rows = st.query_map([], |r| Ok(SavedContact { id: r.get(0)?, name: r.get(1)?, role: r.get(2)?, phone: r.get(3)? }))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    Ok(rows)
 }
 
 pub fn save_contact(conn: &Connection, name: &str, role: &str, phone: &str) -> Result<i64, CoreError> {
@@ -1289,11 +1291,11 @@ impl AttendanceEngine {
     }
 
     pub fn get_classes(&self) -> Result<Vec<ClassGroup>, CoreError> {
-        db::get_classes(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
+        db::get_classes(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
     }
 
     pub fn get_class_attendance(&self, major: String, grade: String, section: i32, date_iso: String, period: Period, search_query: String) -> Result<ClassAttendanceSnapshot, CoreError> {
-        db::get_class_attendance(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, period, &search_query)
+        db::get_class_attendance(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, period, &search_query)
     }
 
     pub fn set_attendance(&self, student_id: i64, date_iso: String, period: Period, status: AttendanceStatus, exit_time: String, note: String, teacher_name: String, lesson_name: String, class_time: String) -> Result<(), CoreError> {
@@ -1302,75 +1304,75 @@ impl AttendanceEngine {
     }
 
     pub fn mark_class_status(&self, major: String, grade: String, section: i32, date_iso: String, period: Period, status: AttendanceStatus, only_unmarked: bool, teacher_name: String, lesson_name: String, class_time: String) -> Result<i32, CoreError> {
-        db::mark_class_status(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, period, status, only_unmarked, &teacher_name, &lesson_name, &class_time)
+        db::mark_class_status(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, period, status, only_unmarked, &teacher_name, &lesson_name, &class_time)
     }
 
     pub fn copy_from_previous_period(&self, major: String, grade: String, section: i32, date_iso: String, target_period: Period) -> Result<i32, CoreError> {
-        db::copy_from_previous_period(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, target_period)
+        db::copy_from_previous_period(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, target_period)
     }
 
     pub fn add_student(&self, school_name: String, major: String, grade: String, section: i32, first_name: String, last_name: String, father_name: String, national_id: String, mobile: String) -> Result<i64, CoreError> {
-        db::add_student(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &school_name, &major, &grade, section, &first_name, &last_name, &father_name, &national_id, &mobile)
+        db::add_student(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &school_name, &major, &grade, section, &first_name, &last_name, &father_name, &national_id, &mobile)
     }
 
     pub fn update_student(&self, student_id: i64, first_name: String, last_name: String, father_name: String, national_id: String, mobile: String) -> Result<(), CoreError> {
-        db::update_student(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, student_id, &first_name, &last_name, &father_name, &national_id, &mobile)
+        db::update_student(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, student_id, &first_name, &last_name, &father_name, &national_id, &mobile)
     }
 
     pub fn delete_student(&self, student_id: i64) -> Result<(), CoreError> {
-        db::delete_student(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, student_id)
+        db::delete_student(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, student_id)
     }
 
     pub fn delete_class(&self, major: String, grade: String, section: i32) -> Result<i32, CoreError> {
-        db::delete_class(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section)
+        db::delete_class(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section)
     }
 
     pub fn get_grade_categories(&self) -> Result<Vec<GradeCategory>, CoreError> {
-        db::get_grade_categories(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
+        db::get_grade_categories(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
     }
 
     pub fn add_grade_category(&self, name: String) -> Result<i64, CoreError> {
-        db::add_grade_category(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &name)
+        db::add_grade_category(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &name)
     }
 
     pub fn delete_grade_category(&self, category_id: i64) -> Result<(), CoreError> {
-        db::delete_grade_category(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, category_id)
+        db::delete_grade_category(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, category_id)
     }
 
     pub fn get_class_grades(&self, major: String, grade: String, section: i32, category_id: i64) -> Result<Vec<StudentGradeRow>, CoreError> {
-        db::get_class_grades(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, category_id)
+        db::get_class_grades(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, category_id)
     }
 
     pub fn set_student_grade(&self, student_id: i64, category_id: i64, score: String, note: String) -> Result<(), CoreError> {
-        db::set_student_grade(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, student_id, category_id, &score, &note)
+        db::set_student_grade(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, student_id, category_id, &score, &note)
     }
 
     pub fn export_gradebook_xlsx(&self, major: String, grade: String, section: i32) -> Result<Vec<u8>, CoreError> {
-        reports::export_gradebook_xlsx(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section)
+        reports::export_gradebook_xlsx(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section)
     }
 
     pub fn get_saved_contacts(&self) -> Result<Vec<SavedContact>, CoreError> {
-        db::get_saved_contacts(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
+        db::get_saved_contacts(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
     }
 
     pub fn save_contact(&self, name: String, role: String, phone: String) -> Result<i64, CoreError> {
-        db::save_contact(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &name, &role, &phone)
+        db::save_contact(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &name, &role, &phone)
     }
 
     pub fn delete_contact(&self, contact_id: i64) -> Result<(), CoreError> {
-        db::delete_contact(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, contact_id)
+        db::delete_contact(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, contact_id)
     }
 
     pub fn get_backup_stats(&self) -> Result<BackupStats, CoreError> {
-        db::get_backup_stats(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
+        db::get_backup_stats(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
     }
 
     pub fn get_class_analytics(&self, major: String, grade: String, section: i32) -> Result<ClassAnalytics, CoreError> {
-        db::get_class_analytics(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section)
+        db::get_class_analytics(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section)
     }
 
     pub fn generate_period_group_message(&self, major: String, grade: String, section: i32, date_iso: String, period: Period, target_status: AttendanceStatus, teacher_name: String, lesson_name: String, whole_school: bool) -> Result<String, CoreError> {
-        reports::generate_period_group_message(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, period, target_status, &teacher_name, &lesson_name, whole_school)
+        reports::generate_period_group_message(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, period, target_status, &teacher_name, &lesson_name, whole_school)
     }
 
     pub fn generate_principal_report(&self, major: String, grade: String, section: i32, date_iso: String, whole_school: bool, teacher_name: String) -> Result<PrincipalReportBundle, CoreError> {
@@ -1380,15 +1382,15 @@ impl AttendanceEngine {
     }
 
     pub fn export_daily_csv(&self, major: String, grade: String, section: i32, date_iso: String) -> Result<String, CoreError> {
-        reports::export_daily_csv(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso)
+        reports::export_daily_csv(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso)
     }
 
     pub fn export_daily_xlsx(&self, major: String, grade: String, section: i32, date_iso: String, whole_school: bool) -> Result<Vec<u8>, CoreError> {
-        reports::export_daily_xlsx(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, whole_school)
+        reports::export_daily_xlsx(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, whole_school)
     }
 
     pub fn get_monthly_report(&self, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<MonthlyClassReport, CoreError> {
-        db::get_monthly_report(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, jalali_year, jalali_month)
+        db::get_monthly_report(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, jalali_year, jalali_month)
     }
 
     pub fn export_monthly_xlsx(&self, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<Vec<u8>, CoreError> {
@@ -1406,7 +1408,7 @@ impl AttendanceEngine {
     pub fn export_template_xlsx(&self) -> Result<Vec<u8>, CoreError> { reports::export_template_xlsx() }
 
     pub fn export_backup_json(&self) -> Result<String, CoreError> {
-        db::export_backup_json(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
+        db::export_backup_json(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
     }
 
     pub fn restore_backup_json(&self, json_text: String) -> Result<ImportReport, CoreError> {
@@ -1426,11 +1428,11 @@ impl AttendanceEngine {
     }
 
     pub fn set_setting(&self, key: String, value: String) -> Result<(), CoreError> {
-        db::set_setting(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &key, &value)
+        db::set_setting(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &key, &value)
     }
 
     pub fn get_setting(&self, key: String) -> Result<String, CoreError> {
-        db::get_setting(&self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &key)
+        db::get_setting(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &key)
     }
 }
 
