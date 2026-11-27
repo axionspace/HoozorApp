@@ -2,7 +2,6 @@ package ir.hozoor.app
 
 import android.app.ActivityManager
 import android.content.Context
-import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import androidx.activity.ComponentActivity

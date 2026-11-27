@@ -1,5 +1,6 @@
 package ir.hozoor.app.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DirectionsRun
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Grade
 import androidx.compose.material.icons.rounded.Schedule
@@ -47,67 +49,47 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import ir.hozoor.app.ui.theme.StatusColors
 import uniffi.hozoor_core.AttendanceStatus
 import uniffi.hozoor_core.Period
 import uniffi.hozoor_core.StudentAttendanceRow
 
-/** کارت مدرن Material 3 Expressive با انیمیشن فنری و دایره‌های تعاملی ۱ تا ۴ (پیش‌فرض سبز -> قرمز -> زرد -> آبی) */
+/** کارت مدرن با دایره‌های کوچک غیرکلیکی ۱ تا ۴ (حاشیه سفید برای زنگ فعال، بدون بریدن نام دانش‌آموز) + وضعیت خروج از کلاس */
 @Composable
 fun StudentAttendanceCard(
     indexInClass: Int,
     student: StudentAttendanceRow,
     selectedPeriod: Period,
     onStatusChange: (AttendanceStatus) -> Unit,
-    onCyclePeriodDot: (periodIndex: Int) -> Unit,
+    onRequestLeftClass: () -> Unit,
     onSendIndividualNotice: (StudentAttendanceRow, AttendanceStatus) -> Unit,
     onCallParent: (String) -> Unit,
-    onQuickScore: (StudentAttendanceRow) -> Unit,
+    onQuickGrade: (StudentAttendanceRow) -> Unit,
     onEditStudent: (StudentAttendanceRow) -> Unit,
     onDeleteStudent: (StudentAttendanceRow) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
-    val accentColor by animateColorAsState(
-        targetValue = statusPrimaryColor(student.currentStatus),
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "accent"
-    )
-    val selectedPeriodIdx = when (selectedPeriod) {
-        Period.FIRST -> 0
-        Period.SECOND -> 1
-        Period.THIRD -> 2
-        Period.FOURTH -> 3
-    }
+    val accentColor by animateColorAsState(statusPrimaryColor(student.currentStatus), spring(stiffness = Spring.StiffnessMediumLow), label = "acc")
+    val activeIdx = when (selectedPeriod) { Period.FIRST -> 0; Period.SECOND -> 1; Period.THIRD -> 2; Period.FOURTH -> 3 }
 
     Surface(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(26.dp),
+        shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.2.dp, accentColor.copy(alpha = 0.42f)),
+        border = BorderStroke(1.2.dp, accentColor.copy(alpha = 0.45f)),
         shadowElevation = 2.dp,
         tonalElevation = 2.dp
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            // ردیف بالایی: آواتار شماره، نام دانش‌آموز و ۴ دایره تعاملی زنگ‌ها (۱ ۲ ۳ ۴)
+        Column(modifier = Modifier.padding(13.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Surface(
-                    shape = CircleShape,
-                    color = accentColor.copy(alpha = 0.14f),
-                    border = BorderStroke(2.dp, accentColor),
-                    modifier = Modifier.size(42.dp)
-                ) {
+                Surface(shape = CircleShape, color = accentColor.copy(alpha = 0.14f), border = BorderStroke(2.dp, accentColor), modifier = Modifier.size(36.dp)) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = toPersianDigits(indexInClass.toString()),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = accentColor
-                        )
+                        Text(toPersianDigits(indexInClass.toString()), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.ExtraBold, color = accentColor)
                     }
                 }
-
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(9.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -115,241 +97,173 @@ fun StudentAttendanceCard(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     val meta = buildString {
                         if (student.fatherName.isNotBlank()) append("فرزند ${student.fatherName}")
-                        if (student.classScore.isNotBlank()) {
+                        if (student.latestGrade.isNotBlank()) {
                             if (isNotEmpty()) append(" • ")
-                            append("نمره: ${toPersianDigits(student.classScore)}")
+                            append("آخرین نمره: ${toPersianDigits(student.latestGrade)}")
                         }
                     }
                     if (meta.isNotBlank()) {
-                        Text(
-                            text = meta,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
 
-                // عددهای ۱ ۲ ۳ ۴: به صورت عادی همه سبز (حاضر)، با هر لمس: سبز -> قرمز -> زرد -> آبی
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.width(6.dp))
+
+                // عددهای کوچک ۱ تا ۴ (غیرکلیکی، حاشیه سفید روی زنگ فعال، بدون اشغال فضای نام)
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
                     for (i in 0..3) {
-                        val rawSt = student.periodStatuses.getOrElse(i) { AttendanceStatus.UNMARKED }
-                        val effectiveSt = if (rawSt == AttendanceStatus.UNMARKED) AttendanceStatus.PRESENT else rawSt
-                        val isActiveBell = i == selectedPeriodIdx
-                        val dotBg by animateColorAsState(
-                            targetValue = statusPrimaryColor(effectiveSt),
-                            animationSpec = spring(stiffness = Spring.StiffnessMedium),
-                            label = "dotBg$i"
-                        )
-                        val dotFg by animateColorAsState(
-                            targetValue = statusOnColor(effectiveSt),
-                            animationSpec = spring(stiffness = Spring.StiffnessMedium),
-                            label = "dotFg$i"
-                        )
-                        val dotScale by animateFloatAsState(
-                            targetValue = if (isActiveBell) 1.12f else 0.96f,
-                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-                            label = "dotScale$i"
-                        )
+                        val raw = student.periodStatuses.getOrElse(i) { AttendanceStatus.UNMARKED }
+                        val eff = if (raw == AttendanceStatus.UNMARKED) AttendanceStatus.PRESENT else raw
+                        val isAct = i == activeIdx
+                        val dotBg by animateColorAsState(statusPrimaryColor(eff), spring(stiffness = Spring.StiffnessMedium), label = "db$i")
+                        val dotFg by animateColorAsState(statusOnColor(eff), spring(stiffness = Spring.StiffnessMedium), label = "df$i")
                         Surface(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onCyclePeriodDot(i)
-                            },
                             shape = CircleShape,
                             color = dotBg,
-                            border = if (isActiveBell) BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface) else null,
-                            modifier = Modifier
-                                .size(28.dp)
-                                .graphicsLayer { scaleX = dotScale; scaleY = dotScale }
+                            border = if (isAct) BorderStroke(1.8.dp, Color.White) else null,
+                            shadowElevation = if (isAct) 2.dp else 0.dp,
+                            modifier = Modifier.size(if (isAct) 22.dp else 19.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = toPersianDigits((i + 1).toString()),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = dotFg
-                                )
+                                Text(toPersianDigits((i + 1).toString()), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = dotFg)
                             }
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
-
-            // ردیف ۴ دکمه وضعیت با انیمیشن تغییر رنگ، تغییر شکل و پرش فنری
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+            // نمایش برچسب ساعت خروج از کلاس (قابل لمس برای ویرایش ساعت خروج)
+            AnimatedVisibility(visible = student.currentStatus == AttendanceStatus.LeftClass) {
+                Surface(
+                    onClick = onRequestLeftClass,
+                    shape = RoundedCornerShape(12.dp),
+                    color = StatusColors.LeftClass.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, StatusColors.LeftClass.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 ) {
-                    AnimatedStatusPill("حاضر", Icons.Rounded.Check, student.currentStatus == AttendanceStatus.PRESENT, StatusColors.Present, StatusColors.OnPresent, Modifier.weight(1f)) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onStatusChange(AttendanceStatus.PRESENT)
-                    }
-                    AnimatedStatusPill("غایب", Icons.Rounded.Close, student.currentStatus == AttendanceStatus.ABSENT, StatusColors.Absent, StatusColors.OnAbsent, Modifier.weight(1f)) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onStatusChange(AttendanceStatus.ABSENT)
-                    }
-                    AnimatedStatusPill("تأخیر", Icons.Rounded.Schedule, student.currentStatus == AttendanceStatus.LATE, StatusColors.Late, StatusColors.OnLate, Modifier.weight(1f)) {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onStatusChange(AttendanceStatus.LATE)
-                    }
-                    AnimatedStatusPill("موجه", Icons.Rounded.VerifiedUser, student.currentStatus == AttendanceStatus.EXCUSED, StatusColors.Excused, StatusColors.OnExcused, Modifier.weight(1f)) {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onStatusChange(AttendanceStatus.EXCUSED)
+                    Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.DirectionsRun, null, tint = StatusColors.LeftClass, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        val info = buildString {
+                            append("خروج از کلاس")
+                            if (student.exitTime.isNotBlank()) append(" ساعت ${toPersianDigits(student.exitTime)}")
+                            if (student.note.isNotBlank()) append(" (${student.note})")
+                        }
+                        Text(info, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = StatusColors.LeftClass, modifier = Modifier.weight(1f))
+                        Text("تغییر ساعت", style = MaterialTheme.typography.labelSmall, color = StatusColors.LeftClass)
                     }
                 }
             }
 
             Spacer(Modifier.height(10.dp))
 
-            // ردیف ابزارهای زیر کارت: پیامک، نمره، تماس، ویرایش، حذف
-            val isAbsent = student.currentStatus == AttendanceStatus.ABSENT
-            val isLate = student.currentStatus == AttendanceStatus.LATE
+            // ۵ وضعیت با انیمیشن فنری: حاضر، غایب، تأخیر، موجه، خروج
+            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.fillMaxWidth().padding(3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    AnimatedStatusPill("حاضر", Icons.Rounded.Check, student.currentStatus == AttendanceStatus.PRESENT, StatusColors.Present, StatusColors.OnPresent, Modifier.weight(1f)) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress); onStatusChange(AttendanceStatus.PRESENT)
+                    }
+                    AnimatedStatusPill("غایب", Icons.Rounded.Close, student.currentStatus == AttendanceStatus.ABSENT, StatusColors.Absent, StatusColors.OnAbsent, Modifier.weight(1f)) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress); onStatusChange(AttendanceStatus.ABSENT)
+                    }
+                    AnimatedStatusPill("تأخیر", Icons.Rounded.Schedule, student.currentStatus == AttendanceStatus.LATE, StatusColors.Late, StatusColors.OnLate, Modifier.weight(1f)) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onStatusChange(AttendanceStatus.LATE)
+                    }
+                    AnimatedStatusPill("موجه", Icons.Rounded.VerifiedUser, student.currentStatus == AttendanceStatus.EXCUSED, StatusColors.Excused, StatusColors.OnExcused, Modifier.weight(1f)) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onStatusChange(AttendanceStatus.EXCUSED)
+                    }
+                    AnimatedStatusPill("خروج", Icons.Rounded.DirectionsRun, student.currentStatus == AttendanceStatus.LeftClass, StatusColors.LeftClass, StatusColors.OnLeftClass, Modifier.weight(1f)) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress); onRequestLeftClass()
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(9.dp))
+
+            val canNotify = student.currentStatus in listOf(AttendanceStatus.ABSENT, AttendanceStatus.LATE, AttendanceStatus.LeftClass)
+            val notifyLabel = when (student.currentStatus) {
+                AttendanceStatus.LATE -> "پیام تأخیر"
+                AttendanceStatus.LeftClass -> "پیام خروج"
+                else -> "پیام غیبت"
+            }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                ActionPill(
-                    label = if (isLate) "پیام تأخیر" else "پیام غیبت",
-                    icon = Icons.Rounded.Sms,
-                    enabled = isAbsent || isLate,
-                    bg = if (isLate) StatusColors.Late else StatusColors.Absent,
-                    fg = if (isLate) StatusColors.OnLate else StatusColors.OnAbsent,
-                    modifier = Modifier.weight(1.45f)
-                ) {
-                    if (isAbsent) onSendIndividualNotice(student, AttendanceStatus.ABSENT)
-                    else if (isLate) onSendIndividualNotice(student, AttendanceStatus.LATE)
+                ActionPill(notifyLabel, Icons.Rounded.Sms, canNotify, accentColor, statusOnColor(student.currentStatus), Modifier.weight(1.4f)) {
+                    onSendIndividualNotice(student, student.currentStatus)
                 }
-                ActionPill(
-                    label = if (student.classScore.isNotBlank()) toPersianDigits(student.classScore) else "نمره",
-                    icon = Icons.Rounded.Grade,
-                    enabled = true,
-                    bg = MaterialTheme.colorScheme.tertiaryContainer,
-                    fg = MaterialTheme.colorScheme.onTertiaryContainer,
-                    modifier = Modifier.weight(0.95f)
-                ) { onQuickScore(student) }
-                IconActionCircle(Icons.Rounded.Call, "تماس", student.mobile.isNotBlank(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer) {
-                    onCallParent(student.mobile)
+                ActionPill("نمره", Icons.Rounded.Grade, true, MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer, Modifier.weight(0.9f)) {
+                    onQuickGrade(student)
                 }
-                IconActionCircle(Icons.Rounded.Edit, "ویرایش", true, MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurface) {
-                    onEditStudent(student)
-                }
-                IconActionCircle(Icons.Rounded.Delete, "حذف", true, MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer) {
-                    onDeleteStudent(student)
-                }
+                IconCircle(Icons.Rounded.Call, "تماس", student.mobile.isNotBlank(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer) { onCallParent(student.mobile) }
+                IconCircle(Icons.Rounded.Edit, "ویرایش", true, MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurface) { onEditStudent(student) }
+                IconCircle(Icons.Rounded.Delete, "حذف", true, MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer) { onDeleteStudent(student) }
             }
         }
     }
 }
 
 @Composable
-private fun AnimatedStatusPill(
-    label: String,
-    icon: ImageVector,
-    selected: Boolean,
-    activeBg: Color,
-    activeFg: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    val bg by animateColorAsState(
-        targetValue = if (selected) activeBg else Color.Transparent,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "stBg"
-    )
-    val fg by animateColorAsState(
-        targetValue = if (selected) activeFg else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "stFg"
-    )
-    val corner by animateDpAsState(
-        targetValue = if (selected) 24.dp else 10.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "stCorner"
-    )
-    val scale by animateFloatAsState(
-        targetValue = if (selected) 1.03f else 0.96f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "stScale"
-    )
+private fun AnimatedStatusPill(label: String, icon: ImageVector, selected: Boolean, activeBg: Color, activeFg: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val bg by animateColorAsState(if (selected) activeBg else Color.Transparent, spring(stiffness = Spring.StiffnessMediumLow), label = "sBg")
+    val fg by animateColorAsState(if (selected) activeFg else MaterialTheme.colorScheme.onSurfaceVariant, spring(stiffness = Spring.StiffnessMediumLow), label = "sFg")
+    val corner by animateDpAsState(if (selected) 20.dp else 10.dp, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium), label = "sCr")
+    val scale by animateFloatAsState(if (selected) 1.04f else 0.96f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium), label = "sSc")
 
-    Row(
-        modifier = modifier
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(RoundedCornerShape(corner))
-            .background(bg)
-            .clickable(onClick = onClick)
-            .padding(vertical = 9.dp, horizontal = 3.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
+    Column(
+        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }.clip(RoundedCornerShape(corner)).background(bg).clickable(onClick = onClick).padding(vertical = 6.dp, horizontal = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(3.dp))
-        Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold, color = fg, maxLines = 1)
+        Icon(icon, label, tint = fg, modifier = Modifier.size(15.dp))
+        Text(label, fontSize = 11.sp, fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold, color = fg, maxLines = 1, softWrap = false)
     }
 }
 
 @Composable
 private fun ActionPill(label: String, icon: ImageVector, enabled: Boolean, bg: Color, fg: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val actualBg by animateColorAsState(if (enabled) bg else MaterialTheme.colorScheme.surfaceContainer, label = "actBg")
-    val actualFg by animateColorAsState(if (enabled) fg else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f), label = "actFg")
+    val aBg by animateColorAsState(if (enabled) bg else MaterialTheme.colorScheme.surfaceContainer, label = "aBg")
+    val aFg by animateColorAsState(if (enabled) fg else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f), label = "aFg")
     Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(actualBg)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 8.dp, horizontal = 6.dp),
+        modifier = modifier.clip(RoundedCornerShape(13.dp)).background(aBg).clickable(enabled = enabled, onClick = onClick).padding(vertical = 7.dp, horizontal = 6.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = label, tint = actualFg, modifier = Modifier.size(15.dp))
+        Icon(icon, label, tint = aFg, modifier = Modifier.size(15.dp))
         Spacer(Modifier.width(4.dp))
-        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = actualFg, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = aFg, maxLines = 1)
     }
 }
 
 @Composable
-private fun IconActionCircle(icon: ImageVector, desc: String, enabled: Boolean, bg: Color, fg: Color, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        shape = CircleShape,
-        color = if (enabled) bg else MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.size(34.dp)
-    ) {
+private fun IconCircle(icon: ImageVector, desc: String, enabled: Boolean, bg: Color, fg: Color, onClick: () -> Unit) {
+    Surface(onClick = onClick, enabled = enabled, shape = CircleShape, color = if (enabled) bg else MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.size(33.dp)) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = desc, tint = if (enabled) fg else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(17.dp))
+            Icon(icon, desc, tint = if (enabled) fg else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
         }
     }
 }
 
-fun statusPrimaryColor(status: AttendanceStatus): Color = when (status) {
+fun statusPrimaryColor(st: AttendanceStatus): Color = when (st) {
     AttendanceStatus.ABSENT -> StatusColors.Absent
     AttendanceStatus.LATE -> StatusColors.Late
     AttendanceStatus.EXCUSED -> StatusColors.Excused
+    AttendanceStatus.LeftClass -> StatusColors.LeftClass
     else -> StatusColors.Present
 }
 
-fun statusOnColor(status: AttendanceStatus): Color = when (status) {
+fun statusOnColor(st: AttendanceStatus): Color = when (st) {
     AttendanceStatus.ABSENT -> StatusColors.OnAbsent
     AttendanceStatus.LATE -> StatusColors.OnLate
     AttendanceStatus.EXCUSED -> StatusColors.OnExcused
+    AttendanceStatus.LeftClass -> StatusColors.OnLeftClass
     else -> StatusColors.OnPresent
 }
 
 fun toPersianDigits(input: String): String {
     val fa = charArrayOf('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹')
-    return buildString(input.length) {
-        for (c in input) if (c in '0'..'9') append(fa[c - '0']) else append(c)
-    }
+    return buildString(input.length) { for (c in input) if (c in '0'..'9') append(fa[c - '0']) else append(c) }
 }

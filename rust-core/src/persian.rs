@@ -3,26 +3,13 @@ use crate::models::{JalaliDayCell, JalaliMonthGrid};
 pub fn normalize_persian(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for ch in input.trim().chars() {
-        let mapped = match ch {
-            'ي' | 'ى' => 'ی',
-            'ك' => 'ک',
-            'ة' | 'ۀ' => 'ه',
-            'ؤ' => 'و',
-            'إ' | 'أ' => 'ا',
-            '۰' | '٠' => '0',
-            '۱' | '١' => '1',
-            '۲' | '٢' => '2',
-            '۳' | '٣' => '3',
-            '۴' | '٤' => '4',
-            '۵' | '٥' => '5',
-            '۶' | '٦' => '6',
-            '۷' | '٧' => '7',
-            '۸' | '٨' => '8',
-            '۹' | '٩' => '9',
-            '\u{0640}' | '\u{064B}'..='\u{065F}' => continue,
-            _ => ch,
+        let m = match ch {
+            'ي' | 'ى' => 'ی', 'ك' => 'ک', 'ة' | 'ۀ' => 'ه', 'ؤ' => 'و', 'إ' | 'أ' => 'ا',
+            '۰' | '٠' => '0', '۱' | '١' => '1', '۲' | '٢' => '2', '۳' | '٣' => '3', '۴' | '٤' => '4',
+            '۵' | '٥' => '5', '۶' | '٦' => '6', '۷' | '٧' => '7', '۸' | '٨' => '8', '۹' | '٩' => '9',
+            '\u{0640}' | '\u{064B}'..='\u{065F}' => continue, _ => ch,
         };
-        out.push(mapped);
+        out.push(m);
     }
     out.to_lowercase()
 }
@@ -45,51 +32,48 @@ pub fn persian_sort_key(input: &str) -> Vec<u8> {
 }
 
 pub fn normalize_national_id(raw: &str) -> String {
-    let digits: String = normalize_persian(raw).chars().filter(|c| c.is_ascii_digit()).collect();
-    if digits.is_empty() { return String::new(); }
-    if digits.len() < 10 { format!("{:0>10}", digits) } else { digits.chars().take(10).collect() }
+    let d: String = normalize_persian(raw).chars().filter(|c| c.is_ascii_digit()).collect();
+    if d.is_empty() { String::new() } else if d.len() < 10 { format!("{:0>10}", d) } else { d.chars().take(10).collect() }
 }
 
 pub fn normalize_mobile(raw: &str) -> String {
-    let digits: String = normalize_persian(raw).chars().filter(|c| c.is_ascii_digit()).collect();
-    if digits.len() == 10 && digits.starts_with('9') { format!("0{digits}") }
-    else if digits.len() == 12 && digits.starts_with("98") { format!("0{}", &digits[2..]) }
-    else { digits }
+    let d: String = normalize_persian(raw).chars().filter(|c| c.is_ascii_digit()).collect();
+    if d.len() == 10 && d.starts_with('9') { format!("0{d}") }
+    else if d.len() == 12 && d.starts_with("98") { format!("0{}", &d[2..]) }
+    else { d }
 }
 
-pub fn grade_rank(grade: &str) -> i32 {
-    match normalize_persian(grade).as_str() {
+pub fn grade_rank(g: &str) -> i32 {
+    match normalize_persian(g).as_str() {
         "اول" => 1, "دوم" => 2, "سوم" => 3, "چهارم" => 4, "پنجم" => 5, "ششم" => 6,
         "هفتم" => 7, "هشتم" => 8, "نهم" => 9, "دهم" => 10, "یازدهم" => 11, "دوازدهم" => 12, _ => 99,
     }
 }
 
-pub fn is_middle_grade(grade: &str) -> bool {
-    matches!(normalize_persian(grade).as_str(), "هفتم" | "هشتم" | "نهم")
-}
+pub fn is_middle_grade(g: &str) -> bool { matches!(normalize_persian(g).as_str(), "هفتم" | "هشتم" | "نهم") }
 
-pub fn format_iso_to_jalali(date_iso: &str) -> String {
-    let p: Vec<&str> = date_iso.split('-').collect();
-    if p.len() != 3 { return to_persian_digits(date_iso); }
-    let (Ok(gy), Ok(gm), Ok(gd)) = (p[0].parse::<i32>(), p[1].parse::<u32>(), p[2].parse::<u32>()) else { return to_persian_digits(date_iso); };
-    if !(1..=12).contains(&gm) || !(1..=31).contains(&gd) { return to_persian_digits(date_iso); }
+pub fn format_iso_to_jalali(iso: &str) -> String {
+    let p: Vec<&str> = iso.split('-').collect();
+    if p.len() != 3 { return to_persian_digits(iso); }
+    let (Ok(gy), Ok(gm), Ok(gd)) = (p[0].parse::<i32>(), p[1].parse::<u32>(), p[2].parse::<u32>()) else { return to_persian_digits(iso); };
+    if !(1..=12).contains(&gm) || !(1..=31).contains(&gd) { return to_persian_digits(iso); }
     let (jy, jm, jd) = gregorian_to_jalali(gy, gm, gd);
     to_persian_digits(&format!("{} {jd} {} {jy}", weekday_fa(gy, gm, gd), month_name_fa(jm)))
 }
 
-pub fn format_iso_to_jalali_short(date_iso: &str) -> String {
-    let p: Vec<&str> = date_iso.split('-').collect();
+pub fn format_iso_to_jalali_short(iso: &str) -> String {
+    let p: Vec<&str> = iso.split('-').collect();
     if p.len() == 3 {
         if let (Ok(gy), Ok(gm), Ok(gd)) = (p[0].parse::<i32>(), p[1].parse::<u32>(), p[2].parse::<u32>()) {
             let (jy, jm, jd) = gregorian_to_jalali(gy, gm, gd);
             return to_persian_digits(&format!("{jd} {} {jy}", month_name_fa(jm)));
         }
     }
-    to_persian_digits(date_iso)
+    to_persian_digits(iso)
 }
 
-pub fn iso_to_jalali_year_month(date_iso: &str) -> (i32, u32) {
-    let p: Vec<&str> = date_iso.split('-').collect();
+pub fn iso_to_jalali_year_month(iso: &str) -> (i32, u32) {
+    let p: Vec<&str> = iso.split('-').collect();
     if p.len() == 3 {
         if let (Ok(gy), Ok(gm), Ok(gd)) = (p[0].parse::<i32>(), p[1].parse::<u32>(), p[2].parse::<u32>()) {
             let (jy, jm, _) = gregorian_to_jalali(gy, gm, gd);
@@ -122,57 +106,51 @@ pub fn jalali_to_gregorian(jy: i32, jm: u32, jd: u32) -> (i32, u32, u32) {
     days %= 1461;
     if days > 365 { gy += (days - 1) / 365; days = (days - 1) % 365; }
     let mut gd = days + 1;
-    let is_leap = (gy % 4 == 0 && gy % 100 != 0) || (gy % 400 == 0);
-    let sal_a = [0, 31, if is_leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let leap = (gy % 4 == 0 && gy % 100 != 0) || (gy % 400 == 0);
+    let sal = [0, 31, if leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     let mut gm = 1u32;
-    while gm <= 12 && gd > sal_a[gm as usize] { gd -= sal_a[gm as usize]; gm += 1; }
+    while gm <= 12 && gd > sal[gm as usize] { gd -= sal[gm as usize]; gm += 1; }
     (gy, gm, gd as u32)
 }
 
 pub fn jalali_month_days(jy: i32, jm: u32) -> u32 {
     match jm {
         1..=6 => 31, 7..=11 => 30,
-        12 => {
-            let (gy, gm, gd) = jalali_to_gregorian(jy, 12, 30);
-            if gregorian_to_jalali(gy, gm, gd) == (jy, 12, 30) { 30 } else { 29 }
-        }
+        12 => { let (gy, gm, gd) = jalali_to_gregorian(jy, 12, 30); if gregorian_to_jalali(gy, gm, gd) == (jy, 12, 30) { 30 } else { 29 } }
         _ => 30,
     }
 }
 
 pub fn jalali_month_range_iso(jy: i32, jm: u32) -> (String, String) {
-    let last_day = jalali_month_days(jy, jm);
+    let last = jalali_month_days(jy, jm);
     let (sy, sm, sd) = jalali_to_gregorian(jy, jm, 1);
-    let (ey, em, ed) = jalali_to_gregorian(jy, jm, last_day);
+    let (ey, em, ed) = jalali_to_gregorian(jy, jm, last);
     (format!("{sy:04}-{sm:02}-{sd:02}"), format!("{ey:04}-{em:02}-{ed:02}"))
 }
 
-pub fn format_jalali_month_label(jy: i32, jm: u32) -> String {
-    to_persian_digits(&format!("{} {}", month_name_fa(jm), jy))
-}
+pub fn format_jalali_month_label(jy: i32, jm: u32) -> String { to_persian_digits(&format!("{} {}", month_name_fa(jm), jy)) }
 
 pub fn build_jalali_month_grid(jy: i32, jm_i32: i32) -> JalaliMonthGrid {
     let jm = jm_i32.clamp(1, 12) as u32;
-    let total_days = jalali_month_days(jy, jm);
+    let total = jalali_month_days(jy, jm);
     let (fy, fm, fd) = jalali_to_gregorian(jy, jm, 1);
-    let first_fa_wd = (sunday_based_weekday(fy, fm, fd) + 1) % 7;
-    let mut days = Vec::with_capacity(total_days as usize);
-    for d in 1..=total_days {
+    let blanks = (sun_wd(fy, fm, fd) + 1) % 7;
+    let mut days = Vec::with_capacity(total as usize);
+    for d in 1..=total {
         let (gy, gm, gd) = jalali_to_gregorian(jy, jm, d);
-        days.push(JalaliDayCell { day: d as i32, date_iso: format!("{gy:04}-{gm:02}-{gd:02}"), is_friday: (sunday_based_weekday(gy, gm, gd) + 1) % 7 == 6 });
+        days.push(JalaliDayCell { day: d as i32, date_iso: format!("{gy:04}-{gm:02}-{gd:02}"), is_friday: (sun_wd(gy, gm, gd) + 1) % 7 == 6 });
     }
-    JalaliMonthGrid { year: jy, month: jm as i32, month_label: format_jalali_month_label(jy, jm), leading_blanks: first_fa_wd as i32, days }
+    JalaliMonthGrid { year: jy, month: jm as i32, month_label: format_jalali_month_label(jy, jm), leading_blanks: blanks as i32, days }
 }
 
-fn sunday_based_weekday(y: i32, m: u32, d: u32) -> usize {
+fn sun_wd(y: i32, m: u32, d: u32) -> usize {
     let t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
     let y = if m < 3 { y - 1 } else { y };
     (y + y / 4 - y / 100 + y / 400 + t[(m - 1) as usize] + d as i32).rem_euclid(7) as usize
 }
 
 fn weekday_fa(y: i32, m: u32, d: u32) -> &'static str {
-    const W: [&str; 7] = ["یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"];
-    W[sunday_based_weekday(y, m, d)]
+    ["یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"][sun_wd(y, m, d)]
 }
 
 pub fn month_name_fa(m: u32) -> &'static str {

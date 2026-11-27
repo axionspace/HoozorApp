@@ -16,7 +16,8 @@ jobs:
       - name: 2. Generate Rust & Android Project Files
         run: |
           python3 setup_part1_rust.py
-          python3 setup_part2_android.py
+          python3 setup_part2_android_base.py
+          python3 setup_part3_screens.py
 
       - name: 3. Setup Node.js 26 LTS
         uses: actions/setup-node@v5

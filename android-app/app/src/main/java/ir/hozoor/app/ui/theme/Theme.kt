@@ -25,26 +25,19 @@ object StatusColors {
     val OnLate = Color(0xFF1A1A1A)
     val Excused = Color(0xFF2563EB)
     val OnExcused = Color.White
+    val LeftClass = Color(0xFF9333EA) // بنفش پرکنتراست برای خروج از کلاس
+    val OnLeftClass = Color.White
 }
 
 private val ExpressiveDarkFallback = darkColorScheme(
-    primary = Color(0xFF4ADE80),
-    onPrimary = Color(0xFF00391A),
-    primaryContainer = Color(0xFF0F5132),
-    onPrimaryContainer = Color(0xFFC2F7D4),
-    secondary = Color(0xFF93C5FD),
-    onSecondary = Color(0xFF003063),
-    secondaryContainer = Color(0xFF1E3A5F),
-    onSecondaryContainer = Color(0xFFD6E7FF),
-    tertiary = Color(0xFFD8B4FE),
-    onTertiary = Color(0xFF3B0764),
-    tertiaryContainer = Color(0xFF4C1D95),
-    onTertiaryContainer = Color(0xFFF3E8FF),
-    background = Color(0xFF0E1311),
-    surface = Color(0xFF0E1311),
-    surfaceContainerLow = Color(0xFF161D1A),
-    surfaceContainer = Color(0xFF1C2521),
-    surfaceContainerHigh = Color(0xFF232E29)
+    primary = Color(0xFF4ADE80), onPrimary = Color(0xFF00391A),
+    primaryContainer = Color(0xFF0F5132), onPrimaryContainer = Color(0xFFC2F7D4),
+    secondary = Color(0xFF93C5FD), onSecondary = Color(0xFF003063),
+    secondaryContainer = Color(0xFF1E3A5F), onSecondaryContainer = Color(0xFFD6E7FF),
+    tertiary = Color(0xFFD8B4FE), onTertiary = Color(0xFF3B0764),
+    tertiaryContainer = Color(0xFF4C1D95), onTertiaryContainer = Color(0xFFF3E8FF),
+    background = Color(0xFF0E1311), surface = Color(0xFF0E1311),
+    surfaceContainerLow = Color(0xFF161D1A), surfaceContainer = Color(0xFF1C2521), surfaceContainerHigh = Color(0xFF232E29)
 )
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

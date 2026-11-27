@@ -32,13 +32,13 @@ fun ExpressiveAttendanceToolbar(
         colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
         floatingActionButton = {
             FloatingToolbarDefaults.VibrantFloatingActionButton(onClick = onImportFile) {
-                Icon(Icons.Rounded.UploadFile, contentDescription = "ورود اکسل یا CSV")
+                Icon(Icons.Rounded.UploadFile, "ورود اکسل یا CSV")
             }
         }
     ) {
         IconButton(onClick = onResetAllPresent) { Icon(Icons.Rounded.DoneAll, "همه حاضر") }
         IconButton(onClick = onCopyFromPrevious, enabled = selectedPeriod != Period.FIRST) { Icon(Icons.Rounded.ContentCopy, "کپی زنگ قبل") }
         IconButton(onClick = onAddStudent) { Icon(Icons.Rounded.PersonAdd, "افزودن دانش‌آموز") }
-        IconButton(onClick = onOpenExportSheet) { Icon(Icons.Rounded.Share, "گزارش مدیر، خروجی و پشتیبان") }
+        IconButton(onClick = onOpenExportSheet) { Icon(Icons.Rounded.Share, "مرکز ارسال، مخاطبین و پشتیبان") }
     }
 }

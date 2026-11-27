@@ -39,13 +39,10 @@ import uniffi.hozoor_core.JalaliDayCell
 import uniffi.hozoor_core.JalaliMonthGrid
 import java.time.LocalDate
 
-private val WEEK_HEADERS = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
+private val WEEK_HDR = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
 
 @Composable
-fun JalaliDatePickerDialog(
-    initialYear: Int, initialMonth: Int, selectedIso: String,
-    gridProvider: (Int, Int) -> JalaliMonthGrid, onSelectIso: (String) -> Unit, onDismiss: () -> Unit
-) {
+fun JalaliDatePickerDialog(initialYear: Int, initialMonth: Int, selectedIso: String, gridProvider: (Int, Int) -> JalaliMonthGrid, onSelectIso: (String) -> Unit, onDismiss: () -> Unit) {
     var year by remember { mutableIntStateOf(initialYear) }
     var month by remember { mutableIntStateOf(initialMonth) }
     val todayIso = remember { LocalDate.now().toString() }
@@ -61,9 +58,7 @@ fun JalaliDatePickerDialog(
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    WEEK_HEADERS.forEachIndexed { idx, w ->
-                        Text(w, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.ExtraBold, color = if (idx == 6) StatusColors.Absent else MaterialTheme.colorScheme.primary)
-                    }
+                    WEEK_HDR.forEachIndexed { idx, w -> Text(w, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.ExtraBold, color = if (idx == 6) StatusColors.Absent else MaterialTheme.colorScheme.primary) }
                 }
                 Spacer(Modifier.height(6.dp))
                 val cells: List<JalaliDayCell?> = List(grid.leadingBlanks) { null } + grid.days
@@ -80,11 +75,7 @@ fun JalaliDatePickerDialog(
                                         color = when { isSel -> MaterialTheme.colorScheme.primary; cell.isFriday -> StatusColors.Absent.copy(alpha = 0.14f); else -> MaterialTheme.colorScheme.surface },
                                         border = if (isToday && !isSel) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
                                         modifier = Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(10.dp)).clickable { onSelectIso(cell.dateIso); onDismiss() }
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(toPersianDigits(cell.day.toString()), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = when { isSel -> MaterialTheme.colorScheme.onPrimary; cell.isFriday -> StatusColors.Absent; else -> MaterialTheme.colorScheme.onSurface })
-                                        }
-                                    }
+                                    ) { Box(contentAlignment = Alignment.Center) { Text(toPersianDigits(cell.day.toString()), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = when { isSel -> MaterialTheme.colorScheme.onPrimary; cell.isFriday -> StatusColors.Absent; else -> MaterialTheme.colorScheme.onSurface }) } }
                                 }
                             }
                             repeat(7 - week.size) { Spacer(Modifier.weight(1f).aspectRatio(1f)) }

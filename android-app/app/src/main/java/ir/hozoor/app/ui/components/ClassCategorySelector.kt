@@ -32,15 +32,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/** دسته‌بندی بدون بخش اضافه مدرسه، با نام کامل رشته‌ها (۲ خطی بدون ...)، نمایش دائمی شعبه و انیمیشن فنری */
 @Composable
 fun ClassCategorySelector(
-    majors: List<String>,
-    selectedMajor: String,
-    grades: List<String>,
-    selectedGrade: String,
-    sections: List<Int>,
-    selectedSection: Int,
+    majors: List<String>, selectedMajor: String,
+    grades: List<String>, selectedGrade: String,
+    sections: List<Int>, selectedSection: Int,
     onSelectMajor: (String) -> Unit,
     onSelectGrade: (String) -> Unit,
     onSelectSection: (Int) -> Unit,
@@ -54,49 +50,13 @@ fun ClassCategorySelector(
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (majors.isNotEmpty()) {
-                AnimatedCategoryGrid(
-                    title = "رشته",
-                    items = majors,
-                    selected = selectedMajor,
-                    labelOf = { it },
-                    itemHeight = 52.dp,
-                    maxLines = 2,
-                    selectedBg = MaterialTheme.colorScheme.primary,
-                    selectedFg = MaterialTheme.colorScheme.onPrimary,
-                    unselectedBg = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f),
-                    unselectedFg = MaterialTheme.colorScheme.onSurface,
-                    onSelect = onSelectMajor
-                )
+                AnimatedCategoryGrid("رشته", majors, selectedMajor, { it }, 52.dp, 2, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary, MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f), MaterialTheme.colorScheme.onSurface, onSelectMajor)
             }
             if (grades.isNotEmpty()) {
-                AnimatedCategoryGrid(
-                    title = "پایه",
-                    items = grades,
-                    selected = selectedGrade,
-                    labelOf = { it },
-                    itemHeight = 44.dp,
-                    maxLines = 1,
-                    selectedBg = MaterialTheme.colorScheme.secondary,
-                    selectedFg = MaterialTheme.colorScheme.onSecondary,
-                    unselectedBg = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
-                    unselectedFg = MaterialTheme.colorScheme.onSurface,
-                    onSelect = onSelectGrade
-                )
+                AnimatedCategoryGrid("پایه", grades, selectedGrade, { it }, 44.dp, 1, MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.onSecondary, MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f), MaterialTheme.colorScheme.onSurface, onSelectGrade)
             }
             if (sections.isNotEmpty()) {
-                AnimatedCategoryGrid(
-                    title = "شعبه",
-                    items = sections,
-                    selected = selectedSection,
-                    labelOf = { "شعبه ${toPersianDigits(it.toString())}" },
-                    itemHeight = 42.dp,
-                    maxLines = 1,
-                    selectedBg = MaterialTheme.colorScheme.tertiary,
-                    selectedFg = MaterialTheme.colorScheme.onTertiary,
-                    unselectedBg = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f),
-                    unselectedFg = MaterialTheme.colorScheme.onSurface,
-                    onSelect = onSelectSection
-                )
+                AnimatedCategoryGrid("شعبه", sections, selectedSection, { "شعبه ${toPersianDigits(it.toString())}" }, 42.dp, 1, MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.onTertiary, MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f), MaterialTheme.colorScheme.onSurface, onSelectSection)
             }
         }
     }
@@ -104,77 +64,30 @@ fun ClassCategorySelector(
 
 @Composable
 private fun <T> AnimatedCategoryGrid(
-    title: String,
-    items: List<T>,
-    selected: T,
-    labelOf: (T) -> String,
-    itemHeight: Dp,
-    maxLines: Int,
-    selectedBg: Color,
-    selectedFg: Color,
-    unselectedBg: Color,
-    unselectedFg: Color,
-    onSelect: (T) -> Unit
+    title: String, items: List<T>, selected: T, labelOf: (T) -> String,
+    itemHeight: Dp, maxLines: Int, selBg: Color, selFg: Color, unselBg: Color, unselFg: Color, onSelect: (T) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     Column {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 5.dp, start = 2.dp)
-        )
+        Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 5.dp, start = 2.dp))
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
             items.chunked(3).forEach { chunk ->
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     chunk.forEach { item ->
-                        val isSelected = item == selected
-                        val bg by animateColorAsState(
-                            targetValue = if (isSelected) selectedBg else unselectedBg,
-                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                            label = "catBg"
-                        )
-                        val fg by animateColorAsState(
-                            targetValue = if (isSelected) selectedFg else unselectedFg,
-                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                            label = "catFg"
-                        )
-                        val corner by animateDpAsState(
-                            targetValue = if (isSelected) 22.dp else 13.dp,
-                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                            label = "catCorner"
-                        )
-                        val scale by animateFloatAsState(
-                            targetValue = if (isSelected) 1.03f else 0.98f,
-                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                            label = "catScale"
-                        )
-
+                        val isSel = item == selected
+                        val bg by animateColorAsState(if (isSel) selBg else unselBg, spring(stiffness = Spring.StiffnessMediumLow), label = "cBg")
+                        val fg by animateColorAsState(if (isSel) selFg else unselFg, spring(stiffness = Spring.StiffnessMediumLow), label = "cFg")
+                        val corner by animateDpAsState(if (isSel) 22.dp else 13.dp, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium), label = "cCr")
+                        val scale by animateFloatAsState(if (isSel) 1.03f else 0.98f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium), label = "cSc")
                         Surface(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onSelect(item)
-                            },
+                            onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onSelect(item) },
                             shape = RoundedCornerShape(corner),
                             color = bg,
-                            tonalElevation = if (isSelected) 4.dp else 0.dp,
-                            shadowElevation = if (isSelected) 3.dp else 0.dp,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(itemHeight)
-                                .graphicsLayer { scaleX = scale; scaleY = scale }
+                            shadowElevation = if (isSel) 3.dp else 0.dp,
+                            modifier = Modifier.weight(1f).height(itemHeight).graphicsLayer { scaleX = scale; scaleY = scale }
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp, vertical = 4.dp)) {
-                                Text(
-                                    text = labelOf(item),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                    color = fg,
-                                    maxLines = maxLines,
-                                    textAlign = TextAlign.Center,
-                                    lineHeight = MaterialTheme.typography.labelLarge.lineHeight
-                                )
+                                Text(labelOf(item), style = MaterialTheme.typography.labelLarge, fontWeight = if (isSel) FontWeight.ExtraBold else FontWeight.SemiBold, color = fg, maxLines = maxLines, textAlign = TextAlign.Center)
                             }
                         }
                     }
