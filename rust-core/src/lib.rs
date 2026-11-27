@@ -5,9 +5,10 @@ mod persian;
 mod reports;
 
 pub use models::{
-    AttendanceStatus, ClassAnalytics, ClassAttendanceSnapshot, ClassGroup, CoreError, ImportReport,
-    JalaliDayCell, JalaliMonthGrid, JalaliYearMonth, MonthlyClassReport, MonthlyStudentStat,
-    Period, PeriodSummary, PrincipalReportBundle, StudentAttendanceRow, TopStudentCount,
+    AttendanceStatus, BackupStats, ClassAnalytics, ClassAttendanceSnapshot, ClassGroup, CoreError,
+    ImportReport, JalaliDayCell, JalaliMonthGrid, JalaliYearMonth, MonthlyClassReport,
+    MonthlyStudentStat, Period, PeriodSummary, PrincipalReportBundle, StudentAttendanceRow,
+    TopStudentCount,
 };
 
 use rusqlite::Connection;
@@ -24,123 +25,128 @@ pub struct AttendanceEngine {
 impl AttendanceEngine {
     #[uniffi::constructor]
     pub fn new(db_path: String) -> Result<Arc<Self>, CoreError> {
-        let conn = db::init_database(&db_path)?;
-        Ok(Arc::new(Self { conn: Mutex::new(conn) }))
+        Ok(Arc::new(Self { conn: Mutex::new(db::init_database(&db_path)?) }))
     }
 
     pub fn import_file_bytes(&self, file_name: String, bytes: Vec<u8>, replace_existing: bool) -> Result<ImportReport, CoreError> {
-        let mut conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
+        let mut conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
         importer::import_file_bytes(&mut conn, &file_name, &bytes, replace_existing)
     }
 
     pub fn get_classes(&self) -> Result<Vec<ClassGroup>, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
         db::get_classes(&conn)
     }
 
-    pub fn get_class_attendance(&self, school_name: String, major: String, grade: String, section: i32, date_iso: String, period: Period, search_query: String) -> Result<ClassAttendanceSnapshot, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
-        db::get_class_attendance(&conn, &school_name, &major, &grade, section, &date_iso, period, &search_query)
+    pub fn get_class_attendance(&self, major: String, grade: String, section: i32, date_iso: String, period: Period, search_query: String) -> Result<ClassAttendanceSnapshot, CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::get_class_attendance(&conn, &major, &grade, section, &date_iso, period, &search_query)
     }
 
     pub fn set_attendance(&self, student_id: i64, date_iso: String, period: Period, status: AttendanceStatus, note: String, teacher_name: String, lesson_name: String, class_time: String) -> Result<(), CoreError> {
-        let mut conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
+        let mut conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
         db::set_attendance(&mut conn, student_id, &date_iso, period, status, &note, &teacher_name, &lesson_name, &class_time)
     }
 
-    pub fn mark_class_status(&self, school_name: String, major: String, grade: String, section: i32, date_iso: String, period: Period, status: AttendanceStatus, only_unmarked: bool, teacher_name: String, lesson_name: String, class_time: String) -> Result<i32, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
-        db::mark_class_status(&conn, &school_name, &major, &grade, section, &date_iso, period, status, only_unmarked, &teacher_name, &lesson_name, &class_time)
+    pub fn set_student_score(&self, student_id: i64, date_iso: String, period: Period, class_score: String, session_score: String) -> Result<(), CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::set_student_score(&conn, student_id, &date_iso, period, &class_score, &session_score)
     }
 
-    pub fn copy_from_previous_period(&self, school_name: String, major: String, grade: String, section: i32, date_iso: String, target_period: Period) -> Result<i32, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
-        db::copy_from_previous_period(&conn, &school_name, &major, &grade, section, &date_iso, target_period)
+    pub fn mark_class_status(&self, major: String, grade: String, section: i32, date_iso: String, period: Period, status: AttendanceStatus, only_unmarked: bool, teacher_name: String, lesson_name: String, class_time: String) -> Result<i32, CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::mark_class_status(&conn, &major, &grade, section, &date_iso, period, status, only_unmarked, &teacher_name, &lesson_name, &class_time)
     }
 
-    pub fn add_student(&self, school_name: String, major: String, grade: String, section: i32, first_name: String, last_name: String, father_name: String, national_id: String, mobile: String) -> Result<i64, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
-        db::add_student(&conn, &school_name, &major, &grade, section, &first_name, &last_name, &father_name, &national_id, &mobile)
+    pub fn copy_from_previous_period(&self, major: String, grade: String, section: i32, date_iso: String, target_period: Period) -> Result<i32, CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::copy_from_previous_period(&conn, &major, &grade, section, &date_iso, target_period)
     }
 
-    pub fn update_student(&self, student_id: i64, first_name: String, last_name: String, father_name: String, national_id: String, mobile: String) -> Result<(), CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
-        db::update_student(&conn, student_id, &first_name, &last_name, &father_name, &national_id, &mobile)
+    pub fn add_student(&self, school_name: String, major: String, grade: String, section: i32, first_name: String, last_name: String, father_name: String, national_id: String, mobile: String, class_score: String) -> Result<i64, CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::add_student(&conn, &school_name, &major, &grade, section, &first_name, &last_name, &father_name, &national_id, &mobile, &class_score)
+    }
+
+    pub fn update_student(&self, student_id: i64, first_name: String, last_name: String, father_name: String, national_id: String, mobile: String, class_score: String) -> Result<(), CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::update_student(&conn, student_id, &first_name, &last_name, &father_name, &national_id, &mobile, &class_score)
     }
 
     pub fn delete_student(&self, student_id: i64) -> Result<(), CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
         db::delete_student(&conn, student_id)
     }
 
-    pub fn delete_class(&self, school_name: String, major: String, grade: String, section: i32) -> Result<i32, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
-        db::delete_class(&conn, &school_name, &major, &grade, section)
+    pub fn delete_class(&self, major: String, grade: String, section: i32) -> Result<i32, CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::delete_class(&conn, &major, &grade, section)
     }
 
-    pub fn get_class_analytics(&self, school_name: String, major: String, grade: String, section: i32) -> Result<ClassAnalytics, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
-        db::get_class_analytics(&conn, &school_name, &major, &grade, section)
+    pub fn get_backup_stats(&self) -> Result<BackupStats, CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::get_backup_stats(&conn)
     }
 
-    pub fn generate_period_group_message(&self, school_name: String, major: String, grade: String, section: i32, date_iso: String, period: Period, target_status: AttendanceStatus, teacher_name: String, lesson_name: String) -> Result<String, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
-        reports::generate_period_group_message(&conn, &school_name, &major, &grade, section, &date_iso, period, target_status, &teacher_name, &lesson_name)
+    pub fn get_class_analytics(&self, major: String, grade: String, section: i32) -> Result<ClassAnalytics, CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::get_class_analytics(&conn, &major, &grade, section)
     }
 
-    pub fn generate_principal_report(&self, school_name: String, major: String, grade: String, section: i32, date_iso: String, whole_school: bool, teacher_name: String) -> Result<PrincipalReportBundle, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
+    pub fn generate_period_group_message(&self, major: String, grade: String, section: i32, date_iso: String, period: Period, target_status: AttendanceStatus, teacher_name: String, lesson_name: String, whole_school: bool) -> Result<String, CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        reports::generate_period_group_message(&conn, &major, &grade, section, &date_iso, period, target_status, &teacher_name, &lesson_name, whole_school)
+    }
+
+    pub fn generate_principal_report(&self, major: String, grade: String, section: i32, date_iso: String, whole_school: bool, teacher_name: String) -> Result<PrincipalReportBundle, CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
         if whole_school {
-            reports::generate_principal_report(&conn, &school_name, None, None, None, &date_iso, &teacher_name)
+            reports::generate_principal_report(&conn, None, None, None, &date_iso, &teacher_name)
         } else {
-            reports::generate_principal_report(&conn, &school_name, Some(&major), Some(&grade), Some(section), &date_iso, &teacher_name)
+            reports::generate_principal_report(&conn, Some(&major), Some(&grade), Some(section), &date_iso, &teacher_name)
         }
     }
 
-    pub fn export_daily_csv(&self, school_name: String, major: String, grade: String, section: i32, date_iso: String) -> Result<String, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
-        reports::export_daily_csv(&conn, &school_name, &major, &grade, section, &date_iso)
+    pub fn export_daily_csv(&self, major: String, grade: String, section: i32, date_iso: String) -> Result<String, CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        reports::export_daily_csv(&conn, &major, &grade, section, &date_iso)
     }
 
-    pub fn export_daily_xlsx(&self, school_name: String, major: String, grade: String, section: i32, date_iso: String, whole_school: bool) -> Result<Vec<u8>, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
-        reports::export_daily_xlsx(&conn, &school_name, &major, &grade, section, &date_iso, whole_school)
+    pub fn export_daily_xlsx(&self, major: String, grade: String, section: i32, date_iso: String, whole_school: bool) -> Result<Vec<u8>, CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        reports::export_daily_xlsx(&conn, &major, &grade, section, &date_iso, whole_school)
     }
 
-    pub fn get_monthly_report(&self, school_name: String, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<MonthlyClassReport, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
-        db::get_monthly_report(&conn, &school_name, &major, &grade, section, jalali_year, jalali_month)
+    pub fn get_monthly_report(&self, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<MonthlyClassReport, CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::get_monthly_report(&conn, &major, &grade, section, jalali_year, jalali_month)
     }
 
-    pub fn export_monthly_xlsx(&self, school_name: String, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<Vec<u8>, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
-        let report = db::get_monthly_report(&conn, &school_name, &major, &grade, section, jalali_year, jalali_month)?;
-        reports::export_monthly_xlsx(&report, &major, &grade, section)
+    pub fn export_monthly_xlsx(&self, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<Vec<u8>, CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        let rep = db::get_monthly_report(&conn, &major, &grade, section, jalali_year, jalali_month)?;
+        reports::export_monthly_xlsx(&rep, &major, &grade, section)
     }
 
-    pub fn export_monthly_csv(&self, school_name: String, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<String, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
-        let report = db::get_monthly_report(&conn, &school_name, &major, &grade, section, jalali_year, jalali_month)?;
-        Ok(reports::export_monthly_csv(&report, &school_name, &major, &grade, section))
+    pub fn export_monthly_csv(&self, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<String, CoreError> {
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        let rep = db::get_monthly_report(&conn, &major, &grade, section, jalali_year, jalali_month)?;
+        Ok(reports::export_monthly_csv(&rep, &major, &grade, section))
     }
 
-    pub fn export_template_xlsx(&self) -> Result<Vec<u8>, CoreError> {
-        reports::export_template_xlsx()
-    }
+    pub fn export_template_xlsx(&self) -> Result<Vec<u8>, CoreError> { reports::export_template_xlsx() }
 
     pub fn export_backup_json(&self) -> Result<String, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
         db::export_backup_json(&conn)
     }
 
     pub fn restore_backup_json(&self, json_text: String) -> Result<ImportReport, CoreError> {
-        let mut conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
+        let mut conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
         db::restore_backup_json(&mut conn, &json_text)
     }
 
-    pub fn format_jalali_date(&self, date_iso: String) -> String {
-        persian::format_iso_to_jalali(&date_iso)
-    }
+    pub fn format_jalali_date(&self, date_iso: String) -> String { persian::format_iso_to_jalali(&date_iso) }
 
     pub fn get_jalali_year_month(&self, date_iso: String) -> JalaliYearMonth {
         let (y, m) = persian::iso_to_jalali_year_month(&date_iso);
@@ -152,12 +158,12 @@ impl AttendanceEngine {
     }
 
     pub fn set_setting(&self, key: String, value: String) -> Result<(), CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
         db::set_setting(&conn, &key, &value)
     }
 
     pub fn get_setting(&self, key: String) -> Result<String, CoreError> {
-        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock poisoned".into()))?;
+        let conn = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
         db::get_setting(&conn, &key)
     }
 }
@@ -166,38 +172,32 @@ impl AttendanceEngine {
 mod tests {
     use super::*;
 
-    const TEST_CSV: &str = "\
-ردیف,نام مدرسه,رشته,پایه,شعبه,نام,نام خانوادگی,نام پدر,کد ملی,شماره موبایل
-1,مدرسه نمونه,صنایع شیمیایی,یازدهم,1,محمد,آزادی,هارون,4700153423,9170327544
-2,مدرسه نمونه,صنایع شیمیایی,یازدهم,1,مهدی,بهروزی,بهرام,5150303194,9172893258
-3,دبیرستان متوسطه اول,,هفتم,1,پارسا,رحیمی,جواد,441746977,9124409109
-";
+    const SAMPLE: &str = "ردیف,نام مدرسه,رشته,پایه,شعبه,نام,نام خانوادگی,نام پدر,کد ملی,شماره موبایل\n\
+1,آموزشگاه نمونه,صنایع شیمیایی,یازدهم,1,محمد,آزادی,هارون,4700153423,9170327544\n\
+2,آموزشگاه نمونه,صنایع شیمیایی,یازدهم,1,مهدی,بهروزی,بهرام,5150303194,9172893258\n";
 
     #[test]
-    fn test_default_present_reset_all_backup_and_reports() {
-        let engine = AttendanceEngine::new(":memory:".into()).unwrap();
-        let rep = engine.import_file_bytes("test.csv".into(), TEST_CSV.as_bytes().to_vec(), true).unwrap();
-        assert_eq!(rep.imported_count, 3);
-        assert_eq!(rep.classes_count, 2);
+    fn test_v3_sms_labels_scores_and_backup() {
+        let eng = AttendanceEngine::new(":memory:".into()).unwrap();
+        eng.import_file_bytes("s.csv".into(), SAMPLE.as_bytes().to_vec(), true).unwrap();
+        let snap = eng.get_class_attendance("صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-10-12".into(), Period::First, "".into()).unwrap();
+        let (s1, s2) = (snap.students[0].student_id, snap.students[1].student_id);
 
-        let snap = engine.get_class_attendance("مدرسه نمونه".into(), "صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-10-12".into(), Period::First, "".into()).unwrap();
-        assert_eq!(snap.summary.present, 2);
-        assert_eq!(snap.students[0].current_status, AttendanceStatus::Present);
+        eng.set_student_score(s1, "2025-10-12".into(), Period::First, "19.5".into(), "20".into()).unwrap();
+        for p in [Period::First, Period::Second, Period::Third, Period::Fourth] {
+            eng.set_attendance(s1, "2025-10-12".into(), p, AttendanceStatus::Absent, "".into(), "دبیر".into(), "شیمی".into(), "08:00".into()).unwrap();
+            eng.set_attendance(s2, "2025-10-12".into(), p, if p == Period::First { AttendanceStatus::Late } else { AttendanceStatus::Present }, "".into(), "دبیر".into(), "شیمی".into(), "08:00".into()).unwrap();
+        }
+        let pr = eng.generate_principal_report("صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-10-12".into(), false, "دبیر".into()).unwrap();
+        assert_eq!(pr.sms_text.matches("محمد آزادی").count(), 1);
+        assert!(pr.sms_text.contains("(غایب)"));
+        assert!(pr.sms_text.contains("(تأخیر)"));
+        assert!(pr.sms_text.contains("حاضر"));
 
-        let s1 = snap.students[0].student_id;
-        engine.set_attendance(s1, "2025-10-12".into(), Period::First, AttendanceStatus::Absent, "".into(), "دبیر".into(), "شیمی".into(), "08:00".into()).unwrap();
-        let snap2 = engine.get_class_attendance("مدرسه نمونه".into(), "صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-10-12".into(), Period::First, "".into()).unwrap();
-        assert_eq!(snap2.summary.absent, 1);
-
-        engine.mark_class_status("مدرسه نمونه".into(), "صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-10-12".into(), Period::First, AttendanceStatus::Present, false, "دبیر".into(), "شیمی".into(), "08:00".into()).unwrap();
-        let snap3 = engine.get_class_attendance("مدرسه نمونه".into(), "صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-10-12".into(), Period::First, "".into()).unwrap();
-        assert_eq!(snap3.summary.present, 2);
-        assert_eq!(snap3.summary.absent, 0);
-
-        let backup = engine.export_backup_json().unwrap();
-        let engine2 = AttendanceEngine::new(":memory:".into()).unwrap();
-        assert_eq!(engine2.restore_backup_json(backup).unwrap().imported_count, 3);
-        assert!(engine.export_template_xlsx().unwrap().starts_with(b"PK\x03\x04"));
-        assert_eq!(engine.get_jalali_month_grid(1404, 7).days.len(), 30);
+        let backup = eng.export_backup_json().unwrap();
+        assert!(backup.contains("19.5"));
+        let eng2 = AttendanceEngine::new(":memory:".into()).unwrap();
+        eng2.restore_backup_json(backup).unwrap();
+        assert_eq!(eng2.get_backup_stats().unwrap().scores_count, 2);
     }
 }

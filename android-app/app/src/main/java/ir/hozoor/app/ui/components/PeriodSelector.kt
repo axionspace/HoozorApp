@@ -33,13 +33,8 @@ private val ALL_PERIODS = listOf(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun PeriodSelector(
-    selectedPeriod: Period,
-    onSelectPeriod: (Period) -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun PeriodSelector(selectedPeriod: Period, onSelectPeriod: (Period) -> Unit, modifier: Modifier = Modifier) {
     val haptic = LocalHapticFeedback.current
-
     Row(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)
@@ -51,7 +46,6 @@ fun PeriodSelector(
                 ALL_PERIODS.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                 else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
             }
-
             ToggleButton(
                 checked = checked,
                 onCheckedChange = {
@@ -71,12 +65,7 @@ fun PeriodSelector(
                     Icon(Icons.Rounded.NotificationsActive, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                 }
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (checked) FontWeight.ExtraBold else FontWeight.Medium,
-                    maxLines = 1
-                )
+                Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = if (checked) FontWeight.ExtraBold else FontWeight.Medium, maxLines = 1)
             }
         }
     }

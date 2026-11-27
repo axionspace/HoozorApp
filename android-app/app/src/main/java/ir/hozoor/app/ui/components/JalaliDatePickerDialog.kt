@@ -43,12 +43,8 @@ private val WEEK_HEADERS = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
 
 @Composable
 fun JalaliDatePickerDialog(
-    initialYear: Int,
-    initialMonth: Int,
-    selectedIso: String,
-    gridProvider: (year: Int, month: Int) -> JalaliMonthGrid,
-    onSelectIso: (String) -> Unit,
-    onDismiss: () -> Unit
+    initialYear: Int, initialMonth: Int, selectedIso: String,
+    gridProvider: (Int, Int) -> JalaliMonthGrid, onSelectIso: (String) -> Unit, onDismiss: () -> Unit
 ) {
     var year by remember { mutableIntStateOf(initialYear) }
     var month by remember { mutableIntStateOf(initialMonth) }
@@ -58,72 +54,35 @@ fun JalaliDatePickerDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(26.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 6.dp) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    IconButton(onClick = { if (month == 1) { month = 12; year -= 1 } else month -= 1 }) {
-                        Icon(Icons.Rounded.ChevronRight, contentDescription = "ماه قبل")
-                    }
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    IconButton(onClick = { if (month == 1) { month = 12; year -= 1 } else month -= 1 }) { Icon(Icons.Rounded.ChevronRight, "ماه قبل") }
                     Text(grid.monthLabel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                    IconButton(onClick = { if (month == 12) { month = 1; year += 1 } else month += 1 }) {
-                        Icon(Icons.Rounded.ChevronLeft, contentDescription = "ماه بعد")
-                    }
+                    IconButton(onClick = { if (month == 12) { month = 1; year += 1 } else month += 1 }) { Icon(Icons.Rounded.ChevronLeft, "ماه بعد") }
                 }
-
                 Spacer(Modifier.height(8.dp))
-
                 Row(modifier = Modifier.fillMaxWidth()) {
                     WEEK_HEADERS.forEachIndexed { idx, w ->
-                        Text(
-                            text = w,
-                            modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = if (idx == 6) StatusColors.Absent else MaterialTheme.colorScheme.primary
-                        )
+                        Text(w, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.ExtraBold, color = if (idx == 6) StatusColors.Absent else MaterialTheme.colorScheme.primary)
                     }
                 }
-
                 Spacer(Modifier.height(6.dp))
-
                 val cells: List<JalaliDayCell?> = List(grid.leadingBlanks) { null } + grid.days
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     cells.chunked(7).forEach { week ->
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             week.forEach { cell ->
-                                if (cell == null) {
-                                    Spacer(Modifier.weight(1f).aspectRatio(1f))
-                                } else {
-                                    val isSelected = cell.dateIso == selectedIso
+                                if (cell == null) Spacer(Modifier.weight(1f).aspectRatio(1f))
+                                else {
+                                    val isSel = cell.dateIso == selectedIso
                                     val isToday = cell.dateIso == todayIso
-                                    val bg = when {
-                                        isSelected -> MaterialTheme.colorScheme.primary
-                                        cell.isFriday -> StatusColors.Absent.copy(alpha = 0.14f)
-                                        else -> MaterialTheme.colorScheme.surface
-                                    }
-                                    val fg = when {
-                                        isSelected -> MaterialTheme.colorScheme.onPrimary
-                                        cell.isFriday -> StatusColors.Absent
-                                        else -> MaterialTheme.colorScheme.onSurface
-                                    }
                                     Surface(
                                         shape = RoundedCornerShape(10.dp),
-                                        color = bg,
-                                        border = if (isToday && !isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .aspectRatio(1f)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .clickable {
-                                                onSelectIso(cell.dateIso)
-                                                onDismiss()
-                                            }
+                                        color = when { isSel -> MaterialTheme.colorScheme.primary; cell.isFriday -> StatusColors.Absent.copy(alpha = 0.14f); else -> MaterialTheme.colorScheme.surface },
+                                        border = if (isToday && !isSel) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+                                        modifier = Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(10.dp)).clickable { onSelectIso(cell.dateIso); onDismiss() }
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
-                                            Text(toPersianDigits(cell.day.toString()), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = fg)
+                                            Text(toPersianDigits(cell.day.toString()), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = when { isSel -> MaterialTheme.colorScheme.onPrimary; cell.isFriday -> StatusColors.Absent; else -> MaterialTheme.colorScheme.onSurface })
                                         }
                                     }
                                 }
@@ -132,9 +91,7 @@ fun JalaliDatePickerDialog(
                         }
                     }
                 }
-
                 Spacer(Modifier.height(14.dp))
-
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
                     Button(onClick = { onSelectIso(todayIso); onDismiss() }, modifier = Modifier.weight(1f)) { Text("امروز") }

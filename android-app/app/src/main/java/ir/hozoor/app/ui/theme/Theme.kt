@@ -17,19 +17,14 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 
 object StatusColors {
-    val Present = Color(0xFF15803D)
+    val Present = Color(0xFF16A34A)
     val OnPresent = Color.White
-
-    val Absent = Color(0xFFC62828)
+    val Absent = Color(0xFFDC2626)
     val OnAbsent = Color.White
-
-    val Late = Color(0xFFEAB308)
+    val Late = Color(0xFFFACC15)
     val OnLate = Color(0xFF1A1A1A)
-
     val Excused = Color(0xFF2563EB)
     val OnExcused = Color.White
-
-    val Unmarked = Color(0xFF757982)
 }
 
 private val ExpressiveDarkFallback = darkColorScheme(
@@ -45,11 +40,11 @@ private val ExpressiveDarkFallback = darkColorScheme(
     onTertiary = Color(0xFF3B0764),
     tertiaryContainer = Color(0xFF4C1D95),
     onTertiaryContainer = Color(0xFFF3E8FF),
-    background = Color(0xFF0F1412),
-    surface = Color(0xFF0F1412),
-    surfaceContainerLow = Color(0xFF171E1B),
-    surfaceContainer = Color(0xFF1C2420),
-    surfaceContainerHigh = Color(0xFF242E2A)
+    background = Color(0xFF0E1311),
+    surface = Color(0xFF0E1311),
+    surfaceContainerLow = Color(0xFF161D1A),
+    surfaceContainer = Color(0xFF1C2521),
+    surfaceContainerHigh = Color(0xFF232E29)
 )
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -69,13 +64,7 @@ fun HozoorExpressiveTheme(
         else -> expressiveLightColorScheme()
     }
     val motionScheme = if (reduceMotion) MotionScheme.standard() else MotionScheme.expressive()
-
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-        MaterialExpressiveTheme(
-            colorScheme = colorScheme,
-            motionScheme = motionScheme,
-            typography = HozoorTypography,
-            content = content
-        )
+        MaterialExpressiveTheme(colorScheme = colorScheme, motionScheme = motionScheme, typography = HozoorTypography, content = content)
     }
 }

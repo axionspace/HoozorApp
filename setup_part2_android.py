@@ -2,18 +2,11 @@ from pathlib import Path
 
 FILES = {
     "android-app/settings.gradle.kts": r'''pluginManagement {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
+    repositories { google(); mavenCentral(); gradlePluginPortal() }
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
-    }
+    repositories { google(); mavenCentral() }
 }
 rootProject.name = "HozoorApp"
 include(":app")
@@ -52,8 +45,8 @@ android {
         applicationId = "ir.hozoor.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.0.0"
+        versionCode = 3
+        versionName = "3.0.0"
     }
 
     signingConfigs {
@@ -70,10 +63,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             signingConfig = signingConfigs.getByName("release")
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 
@@ -92,29 +82,21 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
-    buildFeatures {
-        compose = true
-    }
+    kotlinOptions { jvmTarget = "17" }
+    buildFeatures { compose = true }
 }
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2025.05.00")
     implementation(composeBom)
-
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.compose.material3:material3:1.4.0-alpha15")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui")
-
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-
     implementation("net.java.dev.jna:jna:5.15.0@aar")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
@@ -122,6 +104,13 @@ dependencies {
 
     "android-app/app/src/main/AndroidManifest.xml": r'''<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <intent><action android:name="android.intent.action.SENDTO" /><data android:scheme="smsto" /></intent>
+        <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="sms" /></intent>
+        <intent><action android:name="android.intent.action.SEND" /><data android:mimeType="text/plain" /></intent>
+        <intent><action android:name="android.intent.action.DIAL" /><data android:scheme="tel" /></intent>
+    </queries>
+
     <application
         android:name=".HozoorApplication"
         android:allowBackup="true"
@@ -130,9 +119,7 @@ dependencies {
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+        <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -144,42 +131,31 @@ dependencies {
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
     </application>
 </manifest>
 ''',
 
     "android-app/app/src/main/res/xml/file_paths.xml": r'''<?xml version="1.0" encoding="utf-8"?>
-<paths>
-    <cache-path name="exports" path="exports/" />
-</paths>
+<paths><cache-path name="exports" path="exports/" /></paths>
 ''',
 
     "android-app/app/src/main/res/drawable/ic_launcher_hozoor.xml": r'''<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#146C56"
-        android:pathData="M24,8 L84,8 C93,8 100,15 100,24 L100,84 C100,93 93,100 84,100 L24,100 C15,100 8,93 8,84 L8,24 C8,15 15,8 24,8 Z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M45,72 L27,54 L34,47 L45,58 L74,29 L81,36 Z" />
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#146C56" android:pathData="M24,8 L84,8 C93,8 100,15 100,24 L100,84 C100,93 93,100 84,100 L24,100 C15,100 8,93 8,84 L8,24 C8,15 15,8 24,8 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M45,72 L27,54 L34,47 L45,58 L74,29 L81,36 Z" />
 </vector>
 ''',
 
     "android-app/app/src/main/assets/sample_school.csv": r'''ردیف,نام مدرسه,رشته,پایه,شعبه,نام,نام خانوادگی,نام پدر,کد ملی,شماره موبایل
-1,دبیرستان نمونه,تجربی,دهم,1,علی,احمدی,حسن,1000000001,09121234501
-2,دبیرستان نمونه,تجربی,دهم,1,رضا,رضایی,محمد,1000000002,09121234502
-3,دبیرستان نمونه,تجربی,دهم,2,امیر,کریمی,مهدی,1000000003,09121234503
-4,دبیرستان نمونه,ریاضی,یازدهم,1,حسین,موسوی,سعید,1000000004,09121234504
-5,دبیرستان نمونه,ریاضی,دوازدهم,1,پارسا,رحیمی,بهرام,1000000005,09121234505
-6,دبیرستان متوسطه اول,,هفتم,1,محمد,اکبری,مجید,1000000006,09121234506
-7,دبیرستان متوسطه اول,,هشتم,1,طاها,جعفری,کریم,1000000007,09121234507
+1,آموزشگاه نمونه,صنایع شیمیایی,یازدهم,1,محمد,آزادی,هارون,4700153423,9170327544
+2,آموزشگاه نمونه,صنایع شیمیایی,یازدهم,1,مهدی,بهروزی,بهرام,5150303194,9172893258
+3,آموزشگاه نمونه,صنایع شیمیایی,یازدهم,2,ابراهیم,احمدی,راشد,3560366232,9179739834
+4,آموزشگاه نمونه,الکتروتکنیک,دهم,1,امیرعلی,آریان فر,محمد,4700157801,9173629540
+5,آموزشگاه نمونه,الکتروتکنیک,دوازدهم,1,بنیامین,طاهری,فرشاد,441746977,9124409109
+6,آموزشگاه نمونه,ساختمان,یازدهم,1,امیرحسین,ابراهیمی,محمد,4700154403,9173643201
+7,آموزشگاه نمونه,ساختمان,دوازدهم,1,ابراهیم,رکابکار,عبدالملک,4700139617,9173642185
 ''',
 
     "android-app/app/src/main/java/ir/hozoor/app/HozoorApplication.kt": r'''package ir.hozoor.app
@@ -194,8 +170,7 @@ class HozoorApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        val dbFile = File(filesDir, "hozoor_attendance.db")
-        engine = AttendanceEngine(dbFile.absolutePath)
+        engine = AttendanceEngine(File(filesDir, "hozoor_attendance.db").absolutePath)
     }
 }
 ''',
@@ -226,22 +201,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val app = application as HozoorApplication
-
         setContent {
             val reduceMotion = remember {
                 val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
                 val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-                am.isLowRamDevice || pm.isPowerSaveMode || Build.VERSION.SDK_INT < Build.VERSION_CODES.P
+                am.isLowRamDevice || pm.isPowerSaveMode
             }
-
-            val vm: AttendanceViewModel = viewModel(
-                factory = object : ViewModelProvider.Factory {
-                    @Suppress("UNCHECKED_CAST")
-                    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                        return AttendanceViewModel(app.engine) as T
-                    }
-                }
-            )
+            val vm: AttendanceViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T = AttendanceViewModel(app.engine) as T
+            })
             val uiState by vm.uiState.collectAsStateWithLifecycle()
             val systemDark = isSystemInDarkTheme()
             val useDark = when (uiState.themeMode) {
@@ -249,12 +218,7 @@ class MainActivity : ComponentActivity() {
                 "light" -> false
                 else -> systemDark
             }
-
-            HozoorExpressiveTheme(
-                darkTheme = useDark,
-                dynamicColor = uiState.dynamicColorEnabled,
-                reduceMotion = reduceMotion
-            ) {
+            HozoorExpressiveTheme(darkTheme = useDark, dynamicColor = uiState.dynamicColorEnabled, reduceMotion = reduceMotion) {
                 AttendanceScreen(viewModel = vm, isDarkTheme = useDark)
             }
         }
@@ -274,18 +238,11 @@ import androidx.core.content.FileProvider
 import java.io.File
 
 object FileShareHelper {
-    fun shareBytesAsFile(
-        context: Context,
-        fileName: String,
-        mimeType: String,
-        bytes: ByteArray,
-        chooserTitle: String
-    ) {
+    fun shareBytesAsFile(context: Context, fileName: String, mimeType: String, bytes: ByteArray, chooserTitle: String) {
         val dir = File(context.cacheDir, "exports").apply { mkdirs() }
         val file = File(dir, fileName)
         file.writeBytes(bytes)
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = mimeType
             putExtra(Intent.EXTRA_STREAM, uri)
@@ -295,12 +252,21 @@ object FileShareHelper {
         context.startActivity(Intent.createChooser(intent, chooserTitle))
     }
 
-    fun openSmsApp(context: Context, phone: String, body: String) {
-        val intent = Intent(Intent.ACTION_SENDTO).apply {
-            data = Uri.parse("smsto:${phone.trim()}")
-            putExtra("sms_body", body)
+    /** باز کردن مطمئن برنامه پیامک روی تمام گوشی‌ها (شیائومی، سامسونگ، اندروید ۷ تا ۱۵) */
+    fun openSmsApp(context: Context, phone: String, body: String): Boolean {
+        val cleanPhone = phone.trim()
+        val candidates = listOf(
+            Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$cleanPhone")).apply { putExtra("sms_body", body) },
+            Intent(Intent.ACTION_VIEW, Uri.parse("sms:$cleanPhone")).apply { putExtra("sms_body", body) },
+            Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, body) }
+        )
+        for (intent in candidates) {
+            runCatching {
+                context.startActivity(if (intent.action == Intent.ACTION_SEND) Intent.createChooser(intent, "ارسال پیام") else intent)
+                return true
+            }
         }
-        context.startActivity(intent)
+        return false
     }
 
     fun shareText(context: Context, text: String, title: String) {
@@ -317,11 +283,9 @@ object FileShareHelper {
     }
 
     fun resolveFileName(context: Context, uri: Uri): String {
-        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (idx >= 0 && cursor.moveToFirst()) {
-                return cursor.getString(idx) ?: "students.xlsx"
-            }
+        context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+            val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (idx >= 0 && c.moveToFirst()) return c.getString(idx) ?: "students.xlsx"
         }
         return "students.xlsx"
     }
@@ -383,19 +347,14 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 
 object StatusColors {
-    val Present = Color(0xFF15803D)
+    val Present = Color(0xFF16A34A)
     val OnPresent = Color.White
-
-    val Absent = Color(0xFFC62828)
+    val Absent = Color(0xFFDC2626)
     val OnAbsent = Color.White
-
-    val Late = Color(0xFFEAB308)
+    val Late = Color(0xFFFACC15)
     val OnLate = Color(0xFF1A1A1A)
-
     val Excused = Color(0xFF2563EB)
     val OnExcused = Color.White
-
-    val Unmarked = Color(0xFF757982)
 }
 
 private val ExpressiveDarkFallback = darkColorScheme(
@@ -411,11 +370,11 @@ private val ExpressiveDarkFallback = darkColorScheme(
     onTertiary = Color(0xFF3B0764),
     tertiaryContainer = Color(0xFF4C1D95),
     onTertiaryContainer = Color(0xFFF3E8FF),
-    background = Color(0xFF0F1412),
-    surface = Color(0xFF0F1412),
-    surfaceContainerLow = Color(0xFF171E1B),
-    surfaceContainer = Color(0xFF1C2420),
-    surfaceContainerHigh = Color(0xFF242E2A)
+    background = Color(0xFF0E1311),
+    surface = Color(0xFF0E1311),
+    surfaceContainerLow = Color(0xFF161D1A),
+    surfaceContainer = Color(0xFF1C2521),
+    surfaceContainerHigh = Color(0xFF232E29)
 )
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -435,14 +394,8 @@ fun HozoorExpressiveTheme(
         else -> expressiveLightColorScheme()
     }
     val motionScheme = if (reduceMotion) MotionScheme.standard() else MotionScheme.expressive()
-
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-        MaterialExpressiveTheme(
-            colorScheme = colorScheme,
-            motionScheme = motionScheme,
-            typography = HozoorTypography,
-            content = content
-        )
+        MaterialExpressiveTheme(colorScheme = colorScheme, motionScheme = motionScheme, typography = HozoorTypography, content = content)
     }
 }
 ''',
@@ -461,6 +414,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uniffi.hozoor_core.AttendanceEngine
 import uniffi.hozoor_core.AttendanceStatus
+import uniffi.hozoor_core.BackupStats
 import uniffi.hozoor_core.ClassAnalytics
 import uniffi.hozoor_core.ClassGroup
 import uniffi.hozoor_core.JalaliMonthGrid
@@ -478,9 +432,7 @@ data class AttendanceUiState(
     val themeMode: String = "system",
     val dynamicColorEnabled: Boolean = true,
     val classes: List<ClassGroup> = emptyList(),
-    val schools: List<String> = emptyList(),
-    val selectedSchool: String = "",
-    val majorsForSchool: List<String> = emptyList(),
+    val majors: List<String> = emptyList(),
     val selectedMajor: String = "",
     val gradesForSelection: List<String> = emptyList(),
     val selectedGrade: String = "",
@@ -499,8 +451,10 @@ data class AttendanceUiState(
     val students: List<StudentAttendanceRow> = emptyList(),
     val summary: PeriodSummary = PeriodSummary(0, 0, 0, 0, 0, 0),
     val classAnalytics: ClassAnalytics? = null,
+    val backupStats: BackupStats? = null,
     val principalReport: PrincipalReportBundle? = null,
     val reportWholeSchool: Boolean = false,
+    val sheetFeedback: String? = null,
     val monthlyYear: Int = 1404,
     val monthlyMonth: Int = 7,
     val monthlyReport: MonthlyClassReport? = null,
@@ -515,7 +469,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
 
     init {
         viewModelScope.launch {
-            val settings = withContext(Dispatchers.IO) {
+            val s = withContext(Dispatchers.IO) {
                 mapOf(
                     "teacher" to engine.getSetting("teacher_name"),
                     "lesson" to engine.getSetting("lesson_name"),
@@ -527,11 +481,11 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
             val ym = engine.getJalaliYearMonth(LocalDate.now().toString())
             _uiState.update {
                 it.copy(
-                    teacherName = settings["teacher"].orEmpty(),
-                    lessonName = settings["lesson"].orEmpty(),
-                    principalPhone = settings["phone"].orEmpty(),
-                    themeMode = settings["theme"] ?: "system",
-                    dynamicColorEnabled = settings["dynamic"] != "false",
+                    teacherName = s["teacher"].orEmpty(),
+                    lessonName = s["lesson"].orEmpty(),
+                    principalPhone = s["phone"].orEmpty(),
+                    themeMode = s["theme"] ?: "system",
+                    dynamicColorEnabled = s["dynamic"] != "false",
                     monthlyYear = ym.year,
                     monthlyMonth = ym.month
                 )
@@ -550,152 +504,111 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         val next = !_uiState.value.dynamicColorEnabled
         _uiState.update { it.copy(dynamicColorEnabled = next) }
         viewModelScope.launch(Dispatchers.IO) { engine.setSetting("dynamic_color", next.toString()) }
-        showMessage(if (next) "رنگ پویا (Dynamic Color) فعال شد" else "تم استاندارد Material Expressive فعال شد")
+        showMessage(if (next) "رنگ پویا (Dynamic Color) فعال شد" else "پالت استاندارد فعال شد")
     }
 
-    fun updateTeacherName(value: String) {
-        _uiState.update { it.copy(teacherName = value) }
-        viewModelScope.launch(Dispatchers.IO) { engine.setSetting("teacher_name", value) }
+    fun updateTeacherName(v: String) {
+        _uiState.update { it.copy(teacherName = v) }
+        viewModelScope.launch(Dispatchers.IO) { engine.setSetting("teacher_name", v) }
     }
 
-    fun updateLessonName(value: String) {
-        _uiState.update { it.copy(lessonName = value) }
-        viewModelScope.launch(Dispatchers.IO) { engine.setSetting("lesson_name", value) }
+    fun updateLessonName(v: String) {
+        _uiState.update { it.copy(lessonName = v) }
+        viewModelScope.launch(Dispatchers.IO) { engine.setSetting("lesson_name", v) }
     }
 
-    fun updatePrincipalPhone(value: String) {
-        _uiState.update { it.copy(principalPhone = value) }
-        viewModelScope.launch(Dispatchers.IO) { engine.setSetting("principal_phone", value) }
+    fun updatePrincipalPhone(v: String) {
+        _uiState.update { it.copy(principalPhone = v) }
+        viewModelScope.launch(Dispatchers.IO) { engine.setSetting("principal_phone", v) }
     }
 
-    fun updateClassTime(value: String) {
-        _uiState.update { it.copy(classTime = value) }
-    }
+    fun updateClassTime(v: String) { _uiState.update { it.copy(classTime = v) } }
 
-    fun switchTab(tabIndex: Int) {
-        _uiState.update { it.copy(activeTab = tabIndex) }
-        if (tabIndex == 1) loadAnalyticsAndMonthly()
+    fun switchTab(tab: Int) {
+        _uiState.update { it.copy(activeTab = tab) }
+        if (tab == 1) loadAnalyticsAndMonthly()
     }
 
     fun refreshClassesAndData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val allClasses = withContext(Dispatchers.IO) { engine.getClasses() }
-            resolveCategorySelection(
-                allClasses = allClasses,
-                wantedSchool = _uiState.value.selectedSchool,
-                wantedMajor = _uiState.value.selectedMajor,
-                wantedGrade = _uiState.value.selectedGrade,
-                wantedSection = _uiState.value.selectedSection
-            )
+            val all = withContext(Dispatchers.IO) { engine.getClasses() }
+            resolveCategories(all, _uiState.value.selectedMajor, _uiState.value.selectedGrade, _uiState.value.selectedSection)
             loadAttendanceSnapshot()
             if (_uiState.value.activeTab == 1) loadAnalyticsAndMonthly()
         }
     }
 
-    fun selectSchool(school: String) {
-        resolveCategorySelection(_uiState.value.classes, school, "", "", 1)
-        loadAttendanceSnapshot()
-        if (_uiState.value.activeTab == 1) loadAnalyticsAndMonthly()
-    }
-
     fun selectMajor(major: String) {
         val st = _uiState.value
-        resolveCategorySelection(st.classes, st.selectedSchool, major, st.selectedGrade, st.selectedSection)
+        resolveCategories(st.classes, major, st.selectedGrade, st.selectedSection)
         loadAttendanceSnapshot()
         if (st.activeTab == 1) loadAnalyticsAndMonthly()
     }
 
     fun selectGrade(grade: String) {
         val st = _uiState.value
-        resolveCategorySelection(st.classes, st.selectedSchool, st.selectedMajor, grade, st.selectedSection)
+        resolveCategories(st.classes, st.selectedMajor, grade, st.selectedSection)
         loadAttendanceSnapshot()
         if (st.activeTab == 1) loadAnalyticsAndMonthly()
     }
 
     fun selectSection(section: Int) {
         val st = _uiState.value
-        resolveCategorySelection(st.classes, st.selectedSchool, st.selectedMajor, st.selectedGrade, section)
+        resolveCategories(st.classes, st.selectedMajor, st.selectedGrade, section)
         loadAttendanceSnapshot()
         if (st.activeTab == 1) loadAnalyticsAndMonthly()
     }
 
-    private fun resolveCategorySelection(
-        allClasses: List<ClassGroup>,
-        wantedSchool: String,
-        wantedMajor: String,
-        wantedGrade: String,
-        wantedSection: Int
-    ) {
-        if (allClasses.isEmpty()) {
+    private fun resolveCategories(all: List<ClassGroup>, wantedMajor: String, wantedGrade: String, wantedSection: Int) {
+        if (all.isEmpty()) {
             _uiState.update {
                 it.copy(
-                    classes = emptyList(),
-                    schools = emptyList(),
-                    selectedSchool = "",
-                    majorsForSchool = emptyList(),
-                    selectedMajor = "",
-                    gradesForSelection = emptyList(),
-                    selectedGrade = "",
-                    sectionsForSelection = emptyList(),
-                    selectedSection = 1,
-                    selectedClass = null,
+                    classes = emptyList(), majors = emptyList(), selectedMajor = "",
+                    gradesForSelection = emptyList(), selectedGrade = "",
+                    sectionsForSelection = emptyList(), selectedSection = 1, selectedClass = null,
                     jalaliDate = engine.formatJalaliDate(it.selectedDate.toString())
                 )
             }
             return
         }
-
-        val schools = allClasses.map { it.schoolName }.distinct()
-        val school = if (wantedSchool in schools) wantedSchool else schools.first()
-        val inSchool = allClasses.filter { it.schoolName == school }
-
-        val majors = inSchool.map { it.major }.filter { it.isNotBlank() }.distinct()
+        val majors = all.map { it.major }.filter { it.isNotBlank() }.distinct()
         val major = when {
             majors.isEmpty() -> ""
             wantedMajor in majors -> wantedMajor
             else -> majors.first()
         }
-        val inMajor = if (majors.isEmpty()) inSchool else inSchool.filter { it.major == major }
-
+        val inMajor = if (majors.isEmpty()) all else all.filter { it.major == major }
         val grades = inMajor.map { it.grade }.distinct()
         val grade = if (wantedGrade in grades) wantedGrade else grades.first()
         val inGrade = inMajor.filter { it.grade == grade }
-
         val sections = inGrade.map { it.section }.distinct().sorted()
         val section = if (wantedSection in sections) wantedSection else sections.first()
-        val selectedClass = inGrade.find { it.section == section } ?: inGrade.firstOrNull()
+        val cls = inGrade.find { it.section == section } ?: inGrade.firstOrNull()
 
         _uiState.update {
             it.copy(
-                classes = allClasses,
-                schools = schools,
-                selectedSchool = school,
-                majorsForSchool = majors,
-                selectedMajor = major,
-                gradesForSelection = grades,
-                selectedGrade = grade,
-                sectionsForSelection = sections,
-                selectedSection = section,
-                selectedClass = selectedClass
+                classes = all, majors = majors, selectedMajor = major,
+                gradesForSelection = grades, selectedGrade = grade,
+                sectionsForSelection = sections, selectedSection = section, selectedClass = cls
             )
         }
     }
 
     fun selectPeriod(period: Period) {
-        val defaultTime = when (period) {
+        val time = when (period) {
             Period.FIRST -> "08:00"
             Period.SECOND -> "09:00"
             Period.THIRD -> "10:00"
             Period.FOURTH -> "11:00"
         }
-        _uiState.update { it.copy(selectedPeriod = period, classTime = defaultTime) }
+        _uiState.update { it.copy(selectedPeriod = period, classTime = time) }
         loadAttendanceSnapshot()
     }
 
     fun selectDateIso(dateIso: String) {
-        runCatching { LocalDate.parse(dateIso) }.onSuccess { date ->
-            _uiState.update { it.copy(selectedDate = date) }
+        runCatching { LocalDate.parse(dateIso) }.onSuccess { d ->
+            _uiState.update { it.copy(selectedDate = d) }
             loadAttendanceSnapshot()
         }
     }
@@ -706,7 +619,6 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
     }
 
     fun getJalaliCalendarGrid(year: Int, month: Int): JalaliMonthGrid = engine.getJalaliMonthGrid(year, month)
-
     fun currentDateJalaliYearMonth() = engine.getJalaliYearMonth(_uiState.value.selectedDate.toString())
 
     fun shiftJalaliMonth(delta: Int) {
@@ -719,104 +631,91 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         loadAnalyticsAndMonthly()
     }
 
-    fun toggleMonthlySort() {
-        _uiState.update { it.copy(sortMonthlyByAbsence = !it.sortMonthlyByAbsence) }
-    }
+    fun toggleMonthlySort() { _uiState.update { it.copy(sortMonthlyByAbsence = !it.sortMonthlyByAbsence) } }
+    fun updateSearch(q: String) { _uiState.update { it.copy(searchQuery = q) }; loadAttendanceSnapshot() }
 
-    fun updateSearch(query: String) {
-        _uiState.update { it.copy(searchQuery = query) }
-        loadAttendanceSnapshot()
-    }
-
-    fun setStudentStatus(studentId: Long, status: AttendanceStatus) {
+    fun setStudentStatus(studentId: Long, status: AttendanceStatus, targetPeriod: Period = _uiState.value.selectedPeriod) {
         val st = _uiState.value
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                engine.setAttendance(
-                    studentId = studentId,
-                    dateIso = st.selectedDate.toString(),
-                    period = st.selectedPeriod,
-                    status = status,
-                    note = "",
-                    teacherName = st.teacherName,
-                    lessonName = st.lessonName,
-                    classTime = st.classTime
-                )
+                engine.setAttendance(studentId, st.selectedDate.toString(), targetPeriod, status, "", st.teacherName, st.lessonName, st.classTime)
             }
             loadAttendanceSnapshot()
         }
     }
 
-    /** دکمه دوتا تیک: کل دانش‌آموزان کلاس را (حتی غایب‌ها و تأخیری‌ها) دوباره به «حاضر» برمی‌گرداند */
+    /** لمس مستقیم روی عددهای ۱ تا ۴: سبز(حاضر) -> قرمز(غایب) -> زرد(تأخیر) -> آبی(موجه) -> سبز(حاضر) */
+    fun cycleStudentPeriodStatus(student: StudentAttendanceRow, periodIndex: Int) {
+        val period = when (periodIndex) {
+            0 -> Period.FIRST
+            1 -> Period.SECOND
+            2 -> Period.THIRD
+            else -> Period.FOURTH
+        }
+        val currentRaw = student.periodStatuses.getOrElse(periodIndex) { AttendanceStatus.UNMARKED }
+        val next = when (currentRaw) {
+            AttendanceStatus.UNMARKED, AttendanceStatus.PRESENT -> AttendanceStatus.ABSENT
+            AttendanceStatus.ABSENT -> AttendanceStatus.LATE
+            AttendanceStatus.LATE -> AttendanceStatus.EXCUSED
+            AttendanceStatus.EXCUSED -> AttendanceStatus.PRESENT
+        }
+        setStudentStatus(student.studentId, next, period)
+    }
+
+    fun saveStudentScore(studentId: Long, classScore: String) {
+        val st = _uiState.value
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                engine.setStudentScore(studentId, st.selectedDate.toString(), st.selectedPeriod, classScore, classScore)
+            }
+            loadAttendanceSnapshot()
+            showMessage("نمره ثبت شد")
+        }
+    }
+
     fun resetAllToPresent() {
         val st = _uiState.value
         val cls = st.selectedClass ?: return
         viewModelScope.launch {
             val count = withContext(Dispatchers.IO) {
-                engine.markClassStatus(
-                    schoolName = cls.schoolName,
-                    major = cls.major,
-                    grade = cls.grade,
-                    section = cls.section,
-                    dateIso = st.selectedDate.toString(),
-                    period = st.selectedPeriod,
-                    status = AttendanceStatus.PRESENT,
-                    onlyUnmarked = false,
-                    teacherName = st.teacherName,
-                    lessonName = st.lessonName,
-                    classTime = st.classTime
-                )
+                engine.markClassStatus(cls.major, cls.grade, cls.section, st.selectedDate.toString(), st.selectedPeriod, AttendanceStatus.PRESENT, false, st.teacherName, st.lessonName, st.classTime)
             }
             loadAttendanceSnapshot()
-            showMessage("همه $count دانش‌آموز به حالت حاضر درآمدند و ثبت شدند")
+            showMessage("همه $count دانش‌آموز به حالت حاضر برگشتند")
         }
     }
 
     fun copyFromPreviousPeriod() {
         val st = _uiState.value
         val cls = st.selectedClass ?: return
-        if (st.selectedPeriod == Period.FIRST) {
-            showMessage("زنگ اول، زنگ قبلی ندارد")
-            return
-        }
+        if (st.selectedPeriod == Period.FIRST) { showMessage("زنگ اول، زنگ قبلی ندارد"); return }
         viewModelScope.launch {
             val copied = withContext(Dispatchers.IO) {
-                engine.copyFromPreviousPeriod(
-                    cls.schoolName, cls.major, cls.grade, cls.section,
-                    st.selectedDate.toString(), st.selectedPeriod
-                )
+                engine.copyFromPreviousPeriod(cls.major, cls.grade, cls.section, st.selectedDate.toString(), st.selectedPeriod)
             }
             loadAttendanceSnapshot()
             showMessage(if (copied > 0) "حضور و غیاب $copied نفر از زنگ قبل کپی شد" else "در زنگ قبل موردی ثبت نشده است")
         }
     }
 
-    fun addStudentToCurrentClass(first: String, last: String, father: String, nationalId: String, mobile: String) {
+    fun addStudentToCurrentClass(first: String, last: String, father: String, nid: String, mobile: String, score: String) {
         val cls = _uiState.value.selectedClass ?: return
         viewModelScope.launch {
             try {
-                withContext(Dispatchers.IO) {
-                    engine.addStudent(cls.schoolName, cls.major, cls.grade, cls.section, first, last, father, nationalId, mobile)
-                }
+                withContext(Dispatchers.IO) { engine.addStudent(cls.schoolName, cls.major, cls.grade, cls.section, first, last, father, nid, mobile, score) }
                 refreshClassesAndData()
                 showMessage("دانش‌آموز به کلاس اضافه شد")
-            } catch (e: Exception) {
-                showMessage(e.message ?: "خطا در افزودن دانش‌آموز")
-            }
+            } catch (e: Exception) { showMessage(e.message ?: "خطا در افزودن") }
         }
     }
 
-    fun updateStudent(studentId: Long, first: String, last: String, father: String, nationalId: String, mobile: String) {
+    fun updateStudent(studentId: Long, first: String, last: String, father: String, nid: String, mobile: String, score: String) {
         viewModelScope.launch {
             try {
-                withContext(Dispatchers.IO) {
-                    engine.updateStudent(studentId, first, last, father, nationalId, mobile)
-                }
+                withContext(Dispatchers.IO) { engine.updateStudent(studentId, first, last, father, nid, mobile, score) }
                 loadAttendanceSnapshot()
-                showMessage("اطلاعات دانش‌آموز به‌روزرسانی شد")
-            } catch (e: Exception) {
-                showMessage(e.message ?: "خطا در ویرایش دانش‌آموز")
-            }
+                showMessage("مشخصات دانش‌آموز ذخیره شد")
+            } catch (e: Exception) { showMessage(e.message ?: "خطا در ویرایش") }
         }
     }
 
@@ -831,21 +730,19 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
     fun deleteCurrentClass() {
         val cls = _uiState.value.selectedClass ?: return
         viewModelScope.launch {
-            val count = withContext(Dispatchers.IO) {
-                engine.deleteClass(cls.schoolName, cls.major, cls.grade, cls.section)
-            }
+            val count = withContext(Dispatchers.IO) { engine.deleteClass(cls.major, cls.grade, cls.section) }
             refreshClassesAndData()
-            showMessage("کلاس و $count دانش‌آموز آن حذف شدند")
+            showMessage("کلاس و $count دانش‌آموز حذف شدند")
         }
     }
 
-    fun importFileBytes(fileName: String, bytes: ByteArray, replaceExisting: Boolean = false) {
+    fun importFileBytes(fileName: String, bytes: ByteArray, replaceExisting: Boolean) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val report = withContext(Dispatchers.IO) { engine.importFileBytes(fileName, bytes, replaceExisting) }
+                val rep = withContext(Dispatchers.IO) { engine.importFileBytes(fileName, bytes, replaceExisting) }
                 refreshClassesAndData()
-                showMessage("${report.importedCount} دانش‌آموز در ${report.classesCount} کلاس وارد شد")
+                showMessage("${rep.importedCount} دانش‌آموز در ${rep.classesCount} کلاس وارد شد")
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false) }
                 showMessage("خطا در خواندن فایل: ${e.message}")
@@ -859,7 +756,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
             try {
                 val rep = withContext(Dispatchers.IO) { engine.restoreBackupJson(jsonText) }
                 refreshClassesAndData()
-                showMessage("پشتیبان بازیابی شد: ${rep.importedCount} دانش‌آموز در ${rep.classesCount} کلاس")
+                showMessage("پشتیبان کامل بازیابی شد: ${rep.importedCount} دانش‌آموز")
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false) }
                 showMessage(e.message ?: "فایل پشتیبان معتبر نیست")
@@ -871,7 +768,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         val st = _uiState.value
         viewModelScope.launch {
             val json = withContext(Dispatchers.IO) { engine.exportBackupJson() }
-            onReady("hozoor_backup_${st.selectedDate}.json", json.toByteArray(Charsets.UTF_8))
+            onReady("hozoor_full_backup_${st.selectedDate}.json", json.toByteArray(Charsets.UTF_8))
         }
     }
 
@@ -882,49 +779,47 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         }
     }
 
+    fun prepareExportSheet(wholeSchool: Boolean = _uiState.value.reportWholeSchool) {
+        val st = _uiState.value
+        val cls = st.selectedClass ?: return
+        _uiState.update { it.copy(reportWholeSchool = wholeSchool, sheetFeedback = null) }
+        viewModelScope.launch {
+            val (bundle, stats) = withContext(Dispatchers.IO) {
+                engine.generatePrincipalReport(cls.major, cls.grade, cls.section, st.selectedDate.toString(), wholeSchool, st.teacherName) to
+                    engine.getBackupStats()
+            }
+            _uiState.update { it.copy(principalReport = bundle, backupStats = stats) }
+        }
+    }
+
     fun generatePeriodGroupMessage(targetStatus: AttendanceStatus, onReady: (String) -> Unit) {
         val st = _uiState.value
         val cls = st.selectedClass ?: return
+        _uiState.update { it.copy(sheetFeedback = null) }
         viewModelScope.launch {
             try {
                 val msg = withContext(Dispatchers.IO) {
                     engine.generatePeriodGroupMessage(
-                        cls.schoolName, cls.major, cls.grade, cls.section,
-                        st.selectedDate.toString(), st.selectedPeriod, targetStatus,
-                        st.teacherName, st.lessonName
+                        cls.major, cls.grade, cls.section, st.selectedDate.toString(),
+                        st.selectedPeriod, targetStatus, st.teacherName, st.lessonName, st.reportWholeSchool
                     )
                 }
                 onReady(msg)
             } catch (e: Exception) {
-                showMessage(e.message ?: "موردی یافت نشد")
+                _uiState.update { it.copy(sheetFeedback = e.message ?: "موردی برای ارسال ثبت نشده است") }
             }
         }
     }
 
-    fun preparePrincipalReport(wholeSchool: Boolean = _uiState.value.reportWholeSchool) {
-        val st = _uiState.value
-        val cls = st.selectedClass ?: return
-        _uiState.update { it.copy(reportWholeSchool = wholeSchool) }
-        viewModelScope.launch {
-            val bundle = withContext(Dispatchers.IO) {
-                engine.generatePrincipalReport(
-                    cls.schoolName, cls.major, cls.grade, cls.section,
-                    st.selectedDate.toString(), wholeSchool, st.teacherName
-                )
-            }
-            _uiState.update { it.copy(principalReport = bundle) }
-        }
-    }
+    fun setSheetFeedback(msg: String?) { _uiState.update { it.copy(sheetFeedback = msg) } }
 
     fun exportDailyExcel(wholeSchool: Boolean, onReady: (String, ByteArray) -> Unit) {
         val st = _uiState.value
         val cls = st.selectedClass ?: return
         viewModelScope.launch {
-            val bytes = withContext(Dispatchers.IO) {
-                engine.exportDailyXlsx(cls.schoolName, cls.major, cls.grade, cls.section, st.selectedDate.toString(), wholeSchool)
-            }
-            val prefix = if (wholeSchool) "hozoor_school" else "hozoor_${cls.grade}_${cls.section}"
-            onReady("${prefix}_${st.selectedDate}.xlsx", bytes)
+            val bytes = withContext(Dispatchers.IO) { engine.exportDailyXlsx(cls.major, cls.grade, cls.section, st.selectedDate.toString(), wholeSchool) }
+            val pfx = if (wholeSchool) "hozoor_all" else "hozoor_${cls.grade}_${cls.section}"
+            onReady("${pfx}_${st.selectedDate}.xlsx", bytes)
         }
     }
 
@@ -932,9 +827,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         val st = _uiState.value
         val cls = st.selectedClass ?: return
         viewModelScope.launch {
-            val csv = withContext(Dispatchers.IO) {
-                engine.exportDailyCsv(cls.schoolName, cls.major, cls.grade, cls.section, st.selectedDate.toString())
-            }
+            val csv = withContext(Dispatchers.IO) { engine.exportDailyCsv(cls.major, cls.grade, cls.section, st.selectedDate.toString()) }
             onReady("hozoor_${cls.grade}_${cls.section}_${st.selectedDate}.csv", csv.toByteArray(Charsets.UTF_8))
         }
     }
@@ -943,9 +836,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         val st = _uiState.value
         val cls = st.selectedClass ?: return
         viewModelScope.launch {
-            val bytes = withContext(Dispatchers.IO) {
-                engine.exportMonthlyXlsx(cls.schoolName, cls.major, cls.grade, cls.section, st.monthlyYear, st.monthlyMonth)
-            }
+            val bytes = withContext(Dispatchers.IO) { engine.exportMonthlyXlsx(cls.major, cls.grade, cls.section, st.monthlyYear, st.monthlyMonth) }
             onReady("monthly_${cls.grade}_${cls.section}_${st.monthlyYear}_${st.monthlyMonth}.xlsx", bytes)
         }
     }
@@ -954,28 +845,21 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         val st = _uiState.value
         val cls = st.selectedClass ?: return
         viewModelScope.launch {
-            val csv = withContext(Dispatchers.IO) {
-                engine.exportMonthlyCsv(cls.schoolName, cls.major, cls.grade, cls.section, st.monthlyYear, st.monthlyMonth)
-            }
+            val csv = withContext(Dispatchers.IO) { engine.exportMonthlyCsv(cls.major, cls.grade, cls.section, st.monthlyYear, st.monthlyMonth) }
             onReady("monthly_${cls.grade}_${cls.section}_${st.monthlyYear}_${st.monthlyMonth}.csv", csv.toByteArray(Charsets.UTF_8))
         }
     }
 
-    fun showMessage(msg: String) {
-        _uiState.update { it.copy(snackbarMessage = msg) }
-    }
-
-    fun clearSnackbar() {
-        _uiState.update { it.copy(snackbarMessage = null) }
-    }
+    fun showMessage(msg: String) { _uiState.update { it.copy(snackbarMessage = msg) } }
+    fun clearSnackbar() { _uiState.update { it.copy(snackbarMessage = null) } }
 
     private fun loadAnalyticsAndMonthly() {
         val st = _uiState.value
         val cls = st.selectedClass ?: return
         viewModelScope.launch {
             val (analytics, monthly) = withContext(Dispatchers.IO) {
-                engine.getClassAnalytics(cls.schoolName, cls.major, cls.grade, cls.section) to
-                    engine.getMonthlyReport(cls.schoolName, cls.major, cls.grade, cls.section, st.monthlyYear, st.monthlyMonth)
+                engine.getClassAnalytics(cls.major, cls.grade, cls.section) to
+                    engine.getMonthlyReport(cls.major, cls.grade, cls.section, st.monthlyYear, st.monthlyMonth)
             }
             _uiState.update { it.copy(classAnalytics = analytics, monthlyReport = monthly) }
         }
@@ -986,32 +870,15 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         val cls = st.selectedClass
         if (cls == null) {
             _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    students = emptyList(),
-                    isPeriodSaved = false,
-                    summary = PeriodSummary(0, 0, 0, 0, 0, 0),
-                    jalaliDate = engine.formatJalaliDate(st.selectedDate.toString())
-                )
+                it.copy(isLoading = false, students = emptyList(), isPeriodSaved = false, summary = PeriodSummary(0, 0, 0, 0, 0, 0), jalaliDate = engine.formatJalaliDate(st.selectedDate.toString()))
             }
             return
         }
         viewModelScope.launch {
             val snap = withContext(Dispatchers.IO) {
-                engine.getClassAttendance(
-                    cls.schoolName, cls.major, cls.grade, cls.section,
-                    st.selectedDate.toString(), st.selectedPeriod, st.searchQuery
-                )
+                engine.getClassAttendance(cls.major, cls.grade, cls.section, st.selectedDate.toString(), st.selectedPeriod, st.searchQuery)
             }
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    jalaliDate = snap.jalaliDate,
-                    isPeriodSaved = snap.isPeriodSaved,
-                    summary = snap.summary,
-                    students = snap.students
-                )
-            }
+            _uiState.update { it.copy(isLoading = false, jalaliDate = snap.jalaliDate, isPeriodSaved = snap.isPeriodSaved, summary = snap.summary, students = snap.students) }
         }
     }
 }
@@ -1019,11 +886,18 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
 
     "android-app/app/src/main/java/ir/hozoor/app/ui/components/ClassCategorySelector.kt": r'''package ir.hozoor.app.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -1032,71 +906,62 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+/** دسته‌بندی بدون بخش اضافه مدرسه، با نام کامل رشته‌ها (۲ خطی بدون ...)، نمایش دائمی شعبه و انیمیشن فنری */
 @Composable
 fun ClassCategorySelector(
-    schools: List<String>,
-    selectedSchool: String,
     majors: List<String>,
     selectedMajor: String,
     grades: List<String>,
     selectedGrade: String,
     sections: List<Int>,
     selectedSection: Int,
-    onSelectSchool: (String) -> Unit,
     onSelectMajor: (String) -> Unit,
     onSelectGrade: (String) -> Unit,
     onSelectSection: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(22.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (schools.size > 1) {
-                CategoryGridRow(
-                    title = "مدرسه",
-                    items = schools,
-                    selected = selectedSchool,
-                    labelOf = { it },
-                    selectedBg = MaterialTheme.colorScheme.primary,
-                    selectedFg = MaterialTheme.colorScheme.onPrimary,
-                    unselectedBg = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    unselectedFg = MaterialTheme.colorScheme.onSurface,
-                    onSelect = onSelectSchool
-                )
-            }
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (majors.isNotEmpty()) {
-                CategoryGridRow(
+                AnimatedCategoryGrid(
                     title = "رشته",
                     items = majors,
                     selected = selectedMajor,
                     labelOf = { it },
+                    itemHeight = 52.dp,
+                    maxLines = 2,
                     selectedBg = MaterialTheme.colorScheme.primary,
                     selectedFg = MaterialTheme.colorScheme.onPrimary,
-                    unselectedBg = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                    unselectedBg = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f),
                     unselectedFg = MaterialTheme.colorScheme.onSurface,
                     onSelect = onSelectMajor
                 )
             }
             if (grades.isNotEmpty()) {
-                CategoryGridRow(
+                AnimatedCategoryGrid(
                     title = "پایه",
                     items = grades,
                     selected = selectedGrade,
                     labelOf = { it },
+                    itemHeight = 44.dp,
+                    maxLines = 1,
                     selectedBg = MaterialTheme.colorScheme.secondary,
                     selectedFg = MaterialTheme.colorScheme.onSecondary,
                     unselectedBg = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
@@ -1104,12 +969,14 @@ fun ClassCategorySelector(
                     onSelect = onSelectGrade
                 )
             }
-            if (sections.size > 1) {
-                CategoryGridRow(
+            if (sections.isNotEmpty()) {
+                AnimatedCategoryGrid(
                     title = "شعبه",
                     items = sections,
                     selected = selectedSection,
                     labelOf = { "شعبه ${toPersianDigits(it.toString())}" },
+                    itemHeight = 42.dp,
+                    maxLines = 1,
                     selectedBg = MaterialTheme.colorScheme.tertiary,
                     selectedFg = MaterialTheme.colorScheme.onTertiary,
                     unselectedBg = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f),
@@ -1122,50 +989,77 @@ fun ClassCategorySelector(
 }
 
 @Composable
-private fun <T> CategoryGridRow(
+private fun <T> AnimatedCategoryGrid(
     title: String,
     items: List<T>,
     selected: T,
     labelOf: (T) -> String,
+    itemHeight: Dp,
+    maxLines: Int,
     selectedBg: Color,
     selectedFg: Color,
     unselectedBg: Color,
     unselectedFg: Color,
     onSelect: (T) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     Column {
         Text(
             text = title,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 4.dp, start = 2.dp)
+            modifier = Modifier.padding(bottom = 5.dp, start = 2.dp)
         )
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
             items.chunked(3).forEach { chunk ->
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     chunk.forEach { item ->
                         val isSelected = item == selected
+                        val bg by animateColorAsState(
+                            targetValue = if (isSelected) selectedBg else unselectedBg,
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                            label = "catBg"
+                        )
+                        val fg by animateColorAsState(
+                            targetValue = if (isSelected) selectedFg else unselectedFg,
+                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                            label = "catFg"
+                        )
+                        val corner by animateDpAsState(
+                            targetValue = if (isSelected) 22.dp else 13.dp,
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                            label = "catCorner"
+                        )
+                        val scale by animateFloatAsState(
+                            targetValue = if (isSelected) 1.03f else 0.98f,
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                            label = "catScale"
+                        )
+
                         Surface(
-                            onClick = { onSelect(item) },
-                            shape = RoundedCornerShape(14.dp),
-                            color = if (isSelected) selectedBg else unselectedBg,
-                            border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.outline) else null,
-                            modifier = Modifier.weight(1f).height(42.dp)
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelect(item)
+                            },
+                            shape = RoundedCornerShape(corner),
+                            color = bg,
+                            tonalElevation = if (isSelected) 4.dp else 0.dp,
+                            shadowElevation = if (isSelected) 3.dp else 0.dp,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(itemHeight)
+                                .graphicsLayer { scaleX = scale; scaleY = scale }
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center,
-                                modifier = Modifier.padding(horizontal = 6.dp)
-                            ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp, vertical = 4.dp)) {
                                 Text(
                                     text = labelOf(item),
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                    color = if (isSelected) selectedFg else unselectedFg,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center
+                                    color = fg,
+                                    maxLines = maxLines,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = MaterialTheme.typography.labelLarge.lineHeight
                                 )
                             }
                         }
@@ -1213,13 +1107,8 @@ private val ALL_PERIODS = listOf(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun PeriodSelector(
-    selectedPeriod: Period,
-    onSelectPeriod: (Period) -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun PeriodSelector(selectedPeriod: Period, onSelectPeriod: (Period) -> Unit, modifier: Modifier = Modifier) {
     val haptic = LocalHapticFeedback.current
-
     Row(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)
@@ -1231,7 +1120,6 @@ fun PeriodSelector(
                 ALL_PERIODS.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                 else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
             }
-
             ToggleButton(
                 checked = checked,
                 onCheckedChange = {
@@ -1251,12 +1139,7 @@ fun PeriodSelector(
                     Icon(Icons.Rounded.NotificationsActive, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                 }
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (checked) FontWeight.ExtraBold else FontWeight.Medium,
-                    maxLines = 1
-                )
+                Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = if (checked) FontWeight.ExtraBold else FontWeight.Medium, maxLines = 1)
             }
         }
     }
@@ -1265,16 +1148,19 @@ fun PeriodSelector(
 
     "android-app/app/src/main/java/ir/hozoor/app/ui/components/StudentAttendanceCard.kt": r'''package ir.hozoor.app.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -1288,6 +1174,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Grade
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Sms
 import androidx.compose.material.icons.rounded.VerifiedUser
@@ -1296,10 +1183,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -1308,170 +1197,203 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.hozoor.app.ui.theme.StatusColors
 import uniffi.hozoor_core.AttendanceStatus
+import uniffi.hozoor_core.Period
 import uniffi.hozoor_core.StudentAttendanceRow
 
+/** کارت مدرن Material 3 Expressive با انیمیشن فنری و دایره‌های تعاملی ۱ تا ۴ (پیش‌فرض سبز -> قرمز -> زرد -> آبی) */
 @Composable
 fun StudentAttendanceCard(
     indexInClass: Int,
     student: StudentAttendanceRow,
+    selectedPeriod: Period,
     onStatusChange: (AttendanceStatus) -> Unit,
+    onCyclePeriodDot: (periodIndex: Int) -> Unit,
     onSendIndividualNotice: (StudentAttendanceRow, AttendanceStatus) -> Unit,
     onCallParent: (String) -> Unit,
+    onQuickScore: (StudentAttendanceRow) -> Unit,
     onEditStudent: (StudentAttendanceRow) -> Unit,
     onDeleteStudent: (StudentAttendanceRow) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
-    val accentColor = statusPrimaryColor(student.currentStatus)
+    val accentColor by animateColorAsState(
+        targetValue = statusPrimaryColor(student.currentStatus),
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "accent"
+    )
+    val selectedPeriodIdx = when (selectedPeriod) {
+        Period.FIRST -> 0
+        Period.SECOND -> 1
+        Period.THIRD -> 2
+        Period.FOURTH -> 3
+    }
 
     Surface(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp),
-        shape = RoundedCornerShape(20.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(26.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.2.dp, accentColor.copy(alpha = 0.55f)),
-        tonalElevation = 1.dp
+        border = BorderStroke(1.2.dp, accentColor.copy(alpha = 0.42f)),
+        shadowElevation = 2.dp,
+        tonalElevation = 2.dp
     ) {
-        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            Box(modifier = Modifier.width(6.dp).fillMaxHeight().background(accentColor))
-
-            Column(modifier = Modifier.weight(1f).padding(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(11.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // ردیف بالایی: آواتار شماره، نام دانش‌آموز و ۴ دایره تعاملی زنگ‌ها (۱ ۲ ۳ ۴)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    shape = CircleShape,
+                    color = accentColor.copy(alpha = 0.14f),
+                    border = BorderStroke(2.dp, accentColor),
+                    modifier = Modifier.size(42.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = toPersianDigits(indexInClass.toString()),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = accentColor
                         )
                     }
+                }
 
-                    Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(10.dp))
 
-                    Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "${student.firstName} ${student.lastName}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    val meta = buildString {
+                        if (student.fatherName.isNotBlank()) append("فرزند ${student.fatherName}")
+                        if (student.classScore.isNotBlank()) {
+                            if (isNotEmpty()) append(" • ")
+                            append("نمره: ${toPersianDigits(student.classScore)}")
+                        }
+                    }
+                    if (meta.isNotBlank()) {
                         Text(
-                            text = "${student.firstName} ${student.lastName}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            text = meta,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        val meta = buildString {
-                            if (student.fatherName.isNotBlank()) append("فرزند ${student.fatherName}")
-                            if (student.mobile.isNotBlank()) {
-                                if (isNotEmpty()) append(" · ")
-                                append(toPersianDigits(student.mobile))
-                            }
-                        }
-                        if (meta.isNotBlank()) {
-                            Text(
-                                text = meta,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
                     }
+                }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        student.periodStatuses.forEachIndexed { i, st ->
-                            val dotBg = if (st == AttendanceStatus.UNMARKED) {
-                                MaterialTheme.colorScheme.surfaceContainerHighest
-                            } else statusPrimaryColor(st)
-                            val dotFg = if (st == AttendanceStatus.UNMARKED) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else statusOnColor(st)
-                            Box(
-                                modifier = Modifier.size(22.dp).clip(CircleShape).background(dotBg),
-                                contentAlignment = Alignment.Center
-                            ) {
+                // عددهای ۱ ۲ ۳ ۴: به صورت عادی همه سبز (حاضر)، با هر لمس: سبز -> قرمز -> زرد -> آبی
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    for (i in 0..3) {
+                        val rawSt = student.periodStatuses.getOrElse(i) { AttendanceStatus.UNMARKED }
+                        val effectiveSt = if (rawSt == AttendanceStatus.UNMARKED) AttendanceStatus.PRESENT else rawSt
+                        val isActiveBell = i == selectedPeriodIdx
+                        val dotBg by animateColorAsState(
+                            targetValue = statusPrimaryColor(effectiveSt),
+                            animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                            label = "dotBg$i"
+                        )
+                        val dotFg by animateColorAsState(
+                            targetValue = statusOnColor(effectiveSt),
+                            animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                            label = "dotFg$i"
+                        )
+                        val dotScale by animateFloatAsState(
+                            targetValue = if (isActiveBell) 1.12f else 0.96f,
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                            label = "dotScale$i"
+                        )
+                        Surface(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onCyclePeriodDot(i)
+                            },
+                            shape = CircleShape,
+                            color = dotBg,
+                            border = if (isActiveBell) BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface) else null,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .graphicsLayer { scaleX = dotScale; scaleY = dotScale }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
                                 Text(
                                     text = toPersianDigits((i + 1).toString()),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.ExtraBold,
                                     color = dotFg
                                 )
                             }
                         }
                     }
                 }
+            }
 
-                Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    StatusActionChip("حاضر", Icons.Rounded.Check, student.currentStatus == AttendanceStatus.PRESENT, StatusColors.Present, StatusColors.OnPresent, Modifier.weight(1f)) {
+            // ردیف ۴ دکمه وضعیت با انیمیشن تغییر رنگ، تغییر شکل و پرش فنری
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    AnimatedStatusPill("حاضر", Icons.Rounded.Check, student.currentStatus == AttendanceStatus.PRESENT, StatusColors.Present, StatusColors.OnPresent, Modifier.weight(1f)) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onStatusChange(AttendanceStatus.PRESENT)
                     }
-                    StatusActionChip("غایب", Icons.Rounded.Close, student.currentStatus == AttendanceStatus.ABSENT, StatusColors.Absent, StatusColors.OnAbsent, Modifier.weight(1f)) {
+                    AnimatedStatusPill("غایب", Icons.Rounded.Close, student.currentStatus == AttendanceStatus.ABSENT, StatusColors.Absent, StatusColors.OnAbsent, Modifier.weight(1f)) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onStatusChange(AttendanceStatus.ABSENT)
                     }
-                    StatusActionChip("تأخیر", Icons.Rounded.Schedule, student.currentStatus == AttendanceStatus.LATE, StatusColors.Late, StatusColors.OnLate, Modifier.weight(1f)) {
+                    AnimatedStatusPill("تأخیر", Icons.Rounded.Schedule, student.currentStatus == AttendanceStatus.LATE, StatusColors.Late, StatusColors.OnLate, Modifier.weight(1f)) {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onStatusChange(AttendanceStatus.LATE)
                     }
-                    StatusActionChip("موجه", Icons.Rounded.VerifiedUser, student.currentStatus == AttendanceStatus.EXCUSED, StatusColors.Excused, StatusColors.OnExcused, Modifier.weight(1f)) {
+                    AnimatedStatusPill("موجه", Icons.Rounded.VerifiedUser, student.currentStatus == AttendanceStatus.EXCUSED, StatusColors.Excused, StatusColors.OnExcused, Modifier.weight(1f)) {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onStatusChange(AttendanceStatus.EXCUSED)
                     }
                 }
+            }
 
-                Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
 
-                val canSendAbsent = student.currentStatus == AttendanceStatus.ABSENT
-                val canSendLate = student.currentStatus == AttendanceStatus.LATE
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            // ردیف ابزارهای زیر کارت: پیامک، نمره، تماس، ویرایش، حذف
+            val isAbsent = student.currentStatus == AttendanceStatus.ABSENT
+            val isLate = student.currentStatus == AttendanceStatus.LATE
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                ActionPill(
+                    label = if (isLate) "پیام تأخیر" else "پیام غیبت",
+                    icon = Icons.Rounded.Sms,
+                    enabled = isAbsent || isLate,
+                    bg = if (isLate) StatusColors.Late else StatusColors.Absent,
+                    fg = if (isLate) StatusColors.OnLate else StatusColors.OnAbsent,
+                    modifier = Modifier.weight(1.45f)
                 ) {
-                    CompactActionBtn(
-                        label = if (canSendLate) "پیام تأخیر" else "پیام غیبت",
-                        icon = Icons.Rounded.Sms,
-                        enabled = canSendAbsent || canSendLate,
-                        highlightBg = if (canSendLate) StatusColors.Late else StatusColors.Absent,
-                        highlightFg = if (canSendLate) StatusColors.OnLate else StatusColors.OnAbsent,
-                        modifier = Modifier.weight(1.4f),
-                        onClick = {
-                            if (canSendAbsent) onSendIndividualNotice(student, AttendanceStatus.ABSENT)
-                            else if (canSendLate) onSendIndividualNotice(student, AttendanceStatus.LATE)
-                        }
-                    )
-                    CompactActionBtn(
-                        label = "تماس",
-                        icon = Icons.Rounded.Call,
-                        enabled = student.mobile.isNotBlank(),
-                        highlightBg = MaterialTheme.colorScheme.secondaryContainer,
-                        highlightFg = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onCallParent(student.mobile) }
-                    )
-                    CompactActionBtn(
-                        label = "ویرایش",
-                        icon = Icons.Rounded.Edit,
-                        enabled = true,
-                        highlightBg = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        highlightFg = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onEditStudent(student) }
-                    )
-                    CompactActionBtn(
-                        label = "حذف",
-                        icon = Icons.Rounded.Delete,
-                        enabled = true,
-                        highlightBg = MaterialTheme.colorScheme.errorContainer,
-                        highlightFg = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.weight(0.9f),
-                        onClick = { onDeleteStudent(student) }
-                    )
+                    if (isAbsent) onSendIndividualNotice(student, AttendanceStatus.ABSENT)
+                    else if (isLate) onSendIndividualNotice(student, AttendanceStatus.LATE)
+                }
+                ActionPill(
+                    label = if (student.classScore.isNotBlank()) toPersianDigits(student.classScore) else "نمره",
+                    icon = Icons.Rounded.Grade,
+                    enabled = true,
+                    bg = MaterialTheme.colorScheme.tertiaryContainer,
+                    fg = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.weight(0.95f)
+                ) { onQuickScore(student) }
+                IconActionCircle(Icons.Rounded.Call, "تماس", student.mobile.isNotBlank(), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer) {
+                    onCallParent(student.mobile)
+                }
+                IconActionCircle(Icons.Rounded.Edit, "ویرایش", true, MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurface) {
+                    onEditStudent(student)
+                }
+                IconActionCircle(Icons.Rounded.Delete, "حذف", true, MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer) {
+                    onDeleteStudent(student)
                 }
             }
         }
@@ -1479,7 +1401,7 @@ fun StudentAttendanceCard(
 }
 
 @Composable
-private fun StatusActionChip(
+private fun AnimatedStatusPill(
     label: String,
     icon: ImageVector,
     selected: Boolean,
@@ -1488,64 +1410,89 @@ private fun StatusActionChip(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val bg = if (selected) activeBg else MaterialTheme.colorScheme.surfaceContainerHigh
-    val fg = if (selected) activeFg else MaterialTheme.colorScheme.onSurface
+    val bg by animateColorAsState(
+        targetValue = if (selected) activeBg else Color.Transparent,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "stBg"
+    )
+    val fg by animateColorAsState(
+        targetValue = if (selected) activeFg else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "stFg"
+    )
+    val corner by animateDpAsState(
+        targetValue = if (selected) 24.dp else 10.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "stCorner"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.03f else 0.96f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "stScale"
+    )
+
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(if (selected) 50 else 12))
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(RoundedCornerShape(corner))
             .background(bg)
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp, horizontal = 3.dp),
+            .padding(vertical = 9.dp, horizontal = 3.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(14.dp))
+        Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(15.dp))
         Spacer(Modifier.width(3.dp))
-        Text(text = label, style = MaterialTheme.typography.labelMedium, fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold, color = fg, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold, color = fg, maxLines = 1)
     }
 }
 
 @Composable
-private fun CompactActionBtn(
-    label: String,
-    icon: ImageVector,
-    enabled: Boolean,
-    highlightBg: Color,
-    highlightFg: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    val bg = if (enabled) highlightBg else MaterialTheme.colorScheme.surfaceContainer
-    val fg = if (enabled) highlightFg else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+private fun ActionPill(label: String, icon: ImageVector, enabled: Boolean, bg: Color, fg: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val actualBg by animateColorAsState(if (enabled) bg else MaterialTheme.colorScheme.surfaceContainer, label = "actBg")
+    val actualFg by animateColorAsState(if (enabled) fg else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f), label = "actFg")
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(bg)
+            .clip(RoundedCornerShape(14.dp))
+            .background(actualBg)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 7.dp, horizontal = 4.dp),
+            .padding(vertical = 8.dp, horizontal = 6.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(14.dp))
-        Spacer(Modifier.width(3.dp))
-        Text(text = label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = fg, maxLines = 1)
+        Icon(icon, contentDescription = label, tint = actualFg, modifier = Modifier.size(15.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = actualFg, maxLines = 1)
+    }
+}
+
+@Composable
+private fun IconActionCircle(icon: ImageVector, desc: String, enabled: Boolean, bg: Color, fg: Color, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = CircleShape,
+        color = if (enabled) bg else MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.size(34.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = desc, tint = if (enabled) fg else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(17.dp))
+        }
     }
 }
 
 fun statusPrimaryColor(status: AttendanceStatus): Color = when (status) {
-    AttendanceStatus.PRESENT -> StatusColors.Present
     AttendanceStatus.ABSENT -> StatusColors.Absent
     AttendanceStatus.LATE -> StatusColors.Late
     AttendanceStatus.EXCUSED -> StatusColors.Excused
-    AttendanceStatus.UNMARKED -> StatusColors.Unmarked
+    else -> StatusColors.Present
 }
 
 fun statusOnColor(status: AttendanceStatus): Color = when (status) {
-    AttendanceStatus.PRESENT -> StatusColors.OnPresent
     AttendanceStatus.ABSENT -> StatusColors.OnAbsent
     AttendanceStatus.LATE -> StatusColors.OnLate
     AttendanceStatus.EXCUSED -> StatusColors.OnExcused
-    AttendanceStatus.UNMARKED -> Color.White
+    else -> StatusColors.OnPresent
 }
 
 fun toPersianDigits(input: String): String {
@@ -1601,12 +1548,8 @@ private val WEEK_HEADERS = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
 
 @Composable
 fun JalaliDatePickerDialog(
-    initialYear: Int,
-    initialMonth: Int,
-    selectedIso: String,
-    gridProvider: (year: Int, month: Int) -> JalaliMonthGrid,
-    onSelectIso: (String) -> Unit,
-    onDismiss: () -> Unit
+    initialYear: Int, initialMonth: Int, selectedIso: String,
+    gridProvider: (Int, Int) -> JalaliMonthGrid, onSelectIso: (String) -> Unit, onDismiss: () -> Unit
 ) {
     var year by remember { mutableIntStateOf(initialYear) }
     var month by remember { mutableIntStateOf(initialMonth) }
@@ -1616,72 +1559,35 @@ fun JalaliDatePickerDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(26.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 6.dp) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    IconButton(onClick = { if (month == 1) { month = 12; year -= 1 } else month -= 1 }) {
-                        Icon(Icons.Rounded.ChevronRight, contentDescription = "ماه قبل")
-                    }
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    IconButton(onClick = { if (month == 1) { month = 12; year -= 1 } else month -= 1 }) { Icon(Icons.Rounded.ChevronRight, "ماه قبل") }
                     Text(grid.monthLabel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                    IconButton(onClick = { if (month == 12) { month = 1; year += 1 } else month += 1 }) {
-                        Icon(Icons.Rounded.ChevronLeft, contentDescription = "ماه بعد")
-                    }
+                    IconButton(onClick = { if (month == 12) { month = 1; year += 1 } else month += 1 }) { Icon(Icons.Rounded.ChevronLeft, "ماه بعد") }
                 }
-
                 Spacer(Modifier.height(8.dp))
-
                 Row(modifier = Modifier.fillMaxWidth()) {
                     WEEK_HEADERS.forEachIndexed { idx, w ->
-                        Text(
-                            text = w,
-                            modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = if (idx == 6) StatusColors.Absent else MaterialTheme.colorScheme.primary
-                        )
+                        Text(w, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.ExtraBold, color = if (idx == 6) StatusColors.Absent else MaterialTheme.colorScheme.primary)
                     }
                 }
-
                 Spacer(Modifier.height(6.dp))
-
                 val cells: List<JalaliDayCell?> = List(grid.leadingBlanks) { null } + grid.days
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     cells.chunked(7).forEach { week ->
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             week.forEach { cell ->
-                                if (cell == null) {
-                                    Spacer(Modifier.weight(1f).aspectRatio(1f))
-                                } else {
-                                    val isSelected = cell.dateIso == selectedIso
+                                if (cell == null) Spacer(Modifier.weight(1f).aspectRatio(1f))
+                                else {
+                                    val isSel = cell.dateIso == selectedIso
                                     val isToday = cell.dateIso == todayIso
-                                    val bg = when {
-                                        isSelected -> MaterialTheme.colorScheme.primary
-                                        cell.isFriday -> StatusColors.Absent.copy(alpha = 0.14f)
-                                        else -> MaterialTheme.colorScheme.surface
-                                    }
-                                    val fg = when {
-                                        isSelected -> MaterialTheme.colorScheme.onPrimary
-                                        cell.isFriday -> StatusColors.Absent
-                                        else -> MaterialTheme.colorScheme.onSurface
-                                    }
                                     Surface(
                                         shape = RoundedCornerShape(10.dp),
-                                        color = bg,
-                                        border = if (isToday && !isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .aspectRatio(1f)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .clickable {
-                                                onSelectIso(cell.dateIso)
-                                                onDismiss()
-                                            }
+                                        color = when { isSel -> MaterialTheme.colorScheme.primary; cell.isFriday -> StatusColors.Absent.copy(alpha = 0.14f); else -> MaterialTheme.colorScheme.surface },
+                                        border = if (isToday && !isSel) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+                                        modifier = Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(10.dp)).clickable { onSelectIso(cell.dateIso); onDismiss() }
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
-                                            Text(toPersianDigits(cell.day.toString()), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = fg)
+                                            Text(toPersianDigits(cell.day.toString()), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = when { isSel -> MaterialTheme.colorScheme.onPrimary; cell.isFriday -> StatusColors.Absent; else -> MaterialTheme.colorScheme.onSurface })
                                         }
                                     }
                                 }
@@ -1690,9 +1596,7 @@ fun JalaliDatePickerDialog(
                         }
                     }
                 }
-
                 Spacer(Modifier.height(14.dp))
-
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
                     Button(onClick = { onSelectIso(todayIso); onDismiss() }, modifier = Modifier.weight(1f)) { Text("امروز") }
@@ -1731,35 +1635,49 @@ import uniffi.hozoor_core.StudentAttendanceRow
 @Composable
 fun StudentEditDialog(
     editingStudent: StudentAttendanceRow?,
-    onSave: (first: String, last: String, father: String, nationalId: String, mobile: String) -> Unit,
+    onSave: (first: String, last: String, father: String, nationalId: String, mobile: String, score: String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var first by remember { mutableStateOf(editingStudent?.firstName.orEmpty()) }
     var last by remember { mutableStateOf(editingStudent?.lastName.orEmpty()) }
     var father by remember { mutableStateOf(editingStudent?.fatherName.orEmpty()) }
-    var nationalId by remember { mutableStateOf(editingStudent?.nationalId.orEmpty()) }
+    var nid by remember { mutableStateOf(editingStudent?.nationalId.orEmpty()) }
     var mobile by remember { mutableStateOf(editingStudent?.mobile.orEmpty()) }
+    var score by remember { mutableStateOf(editingStudent?.classScore.orEmpty()) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
             Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = if (editingStudent == null) "افزودن دانش‌آموز جدید" else "ویرایش مشخصات دانش‌آموز",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold
-                )
+                Text(if (editingStudent == null) "افزودن دانش‌آموز جدید" else "ویرایش دانش‌آموز", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
                 OutlinedTextField(value = first, onValueChange = { first = it }, label = { Text("نام") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = last, onValueChange = { last = it }, label = { Text("نام خانوادگی") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = father, onValueChange = { father = it }, label = { Text("نام پدر") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = nationalId, onValueChange = { nationalId = it.take(10) }, label = { Text("کد ملی (۱۰ رقم)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = mobile, onValueChange = { mobile = it }, label = { Text("شماره موبایل") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-
+                OutlinedTextField(value = nid, onValueChange = { nid = it.take(10) }, label = { Text("کد ملی (۱۰ رقم)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = mobile, onValueChange = { mobile = it }, label = { Text("موبایل") }, singleLine = true, modifier = Modifier.weight(1.4f))
+                    OutlinedTextField(value = score, onValueChange = { score = it.take(6) }, label = { Text("نمره") }, singleLine = true, modifier = Modifier.weight(0.8f))
+                }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("لغو") }
-                    Button(
-                        onClick = { onSave(first, last, father, nationalId, mobile); onDismiss() },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("ذخیره") }
+                    Button(onClick = { onSave(first, last, father, nid, mobile, score); onDismiss() }, modifier = Modifier.weight(1f)) { Text("ذخیره") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun QuickScoreDialog(student: StudentAttendanceRow, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    var score by remember { mutableStateOf(student.classScore) }
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("ثبت نمره کلاسی", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                Text("${student.firstName} ${student.lastName}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                OutlinedTextField(value = score, onValueChange = { score = it.take(6) }, label = { Text("نمره (مثلاً ۱۹.۵ یا ۲۰)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
+                    Button(onClick = { onSave(score); onDismiss() }, modifier = Modifier.weight(1f)) { Text("ثبت نمره") }
                 }
             }
         }
@@ -1805,24 +1723,17 @@ fun ExpressiveAttendanceToolbar(
             }
         }
     ) {
-        IconButton(onClick = onResetAllPresent) {
-            Icon(Icons.Rounded.DoneAll, contentDescription = "همه حاضر")
-        }
-        IconButton(onClick = onCopyFromPrevious, enabled = selectedPeriod != Period.FIRST) {
-            Icon(Icons.Rounded.ContentCopy, contentDescription = "کپی از زنگ قبل")
-        }
-        IconButton(onClick = onAddStudent) {
-            Icon(Icons.Rounded.PersonAdd, contentDescription = "افزودن دانش‌آموز")
-        }
-        IconButton(onClick = onOpenExportSheet) {
-            Icon(Icons.Rounded.Share, contentDescription = "گزارش مدیر، خروجی و پشتیبان")
-        }
+        IconButton(onClick = onResetAllPresent) { Icon(Icons.Rounded.DoneAll, "همه حاضر") }
+        IconButton(onClick = onCopyFromPrevious, enabled = selectedPeriod != Period.FIRST) { Icon(Icons.Rounded.ContentCopy, "کپی زنگ قبل") }
+        IconButton(onClick = onAddStudent) { Icon(Icons.Rounded.PersonAdd, "افزودن دانش‌آموز") }
+        IconButton(onClick = onOpenExportSheet) { Icon(Icons.Rounded.Share, "گزارش مدیر، خروجی و پشتیبان") }
     }
 }
 ''',
 
     "android-app/app/src/main/java/ir/hozoor/app/ui/components/ExportAndReportSheet.kt": r'''package ir.hozoor.app.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -1840,10 +1751,12 @@ import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.Restore
+import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.Sms
 import androidx.compose.material.icons.rounded.TableChart
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -1863,15 +1776,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ir.hozoor.app.ui.theme.StatusColors
 import uniffi.hozoor_core.AttendanceStatus
+import uniffi.hozoor_core.BackupStats
+import uniffi.hozoor_core.PeriodSummary
 import uniffi.hozoor_core.PrincipalReportBundle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportAndReportSheet(
     report: PrincipalReportBundle?,
+    summary: PeriodSummary,
+    backupStats: BackupStats?,
     wholeSchool: Boolean,
     principalPhone: String,
+    feedbackMessage: String?,
     onToggleWholeSchool: (Boolean) -> Unit,
     onPrincipalPhoneChange: (String) -> Unit,
     onSendSms: (phone: String, smsText: String) -> Unit,
@@ -1882,7 +1801,8 @@ fun ExportAndReportSheet(
     onExportExcel: () -> Unit,
     onExportCsv: () -> Unit,
     onExportTemplateExcel: () -> Unit,
-    onExportBackupJson: () -> Unit,
+    onSaveBackupToDevice: () -> Unit,
+    onShareBackupJson: () -> Unit,
     onRestoreBackupJson: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1897,112 +1817,113 @@ fun ExportAndReportSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("گزارش مدیر، خروجی و پشتیبان‌گیری", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+            Text("گزارش مدیر، خروجی و پشتیبان کلی", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+
+            // پیام راهنما/خطا دقیقاً داخل خود شیت تا هیچ‌وقت پشت صفحه مخفی نشود
+            AnimatedVisibility(visible = !feedbackMessage.isNullOrBlank()) {
+                Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
+                    Text(feedbackMessage.orEmpty(), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(12.dp))
+                }
+            }
 
             OutlinedTextField(
                 value = principalPhone,
                 onValueChange = onPrincipalPhoneChange,
                 label = { Text("شماره موبایل مدیر (برای پیامک عادی)") },
                 placeholder = { Text("0917xxxxxxx") },
-                leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Rounded.Phone, null) },
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
             )
 
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !wholeSchool, onClick = { onToggleWholeSchool(false) }, label = { Text("کلاس فعلی") })
+                FilterChip(selected = wholeSchool, onClick = { onToggleWholeSchool(true) }, label = { Text("کل کلاس‌ها") })
+                Spacer(Modifier.weight(1f))
+                FilterChip(selected = previewSmsMode, onClick = { previewSmsMode = !previewSmsMode }, label = { Text(if (previewSmsMode) "پیامک فشرده" else "متن کامل") })
+            }
+
+            // ارسال پیام گروهی همین زنگ (با نمایش تعداد روی دکمه)
             Text("ارسال پیام گروهی همین زنگ به مدیر", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            val absLabel = if (!wholeSchool) " (${toPersianDigits(summary.absent.toString())})" else ""
+            val lateLabel = if (!wholeSchool) " (${toPersianDigits(summary.late.toString())})" else ""
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = { onSendGroupPeriodSms(AttendanceStatus.ABSENT) }, modifier = Modifier.weight(1f)) {
-                    Text("غیبت با پیامک")
-                }
+                Button(
+                    onClick = { onSendGroupPeriodSms(AttendanceStatus.ABSENT) },
+                    colors = ButtonDefaults.buttonColors(containerColor = StatusColors.Absent, contentColor = StatusColors.OnAbsent),
+                    modifier = Modifier.weight(1f)
+                ) { Text("غیبت با پیامک$absLabel", maxLines = 1) }
                 FilledTonalButton(onClick = { onSendGroupPeriodShare(AttendanceStatus.ABSENT) }, modifier = Modifier.weight(1f)) {
-                    Text("غیبت در پیام‌رسان")
+                    Text("غیبت در پیام‌رسان", maxLines = 1)
                 }
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { onSendGroupPeriodSms(AttendanceStatus.LATE) }, modifier = Modifier.weight(1f)) {
-                    Text("تأخیر با پیامک")
-                }
+                Button(
+                    onClick = { onSendGroupPeriodSms(AttendanceStatus.LATE) },
+                    colors = ButtonDefaults.buttonColors(containerColor = StatusColors.Late, contentColor = StatusColors.OnLate),
+                    modifier = Modifier.weight(1f)
+                ) { Text("تأخیر با پیامک$lateLabel", maxLines = 1) }
                 OutlinedButton(onClick = { onSendGroupPeriodShare(AttendanceStatus.LATE) }, modifier = Modifier.weight(1f)) {
-                    Text("تأخیر در پیام‌رسان")
+                    Text("تأخیر در پیام‌رسان", maxLines = 1)
                 }
             }
 
             HorizontalDivider()
 
-            Text("گزارش تجمیعی کل روز (بدون تکرار کل روز در زنگ‌ها)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !wholeSchool, onClick = { onToggleWholeSchool(false) }, label = { Text("کلاس فعلی") })
-                FilterChip(selected = wholeSchool, onClick = { onToggleWholeSchool(true) }, label = { Text("کل مدرسه") })
-                Spacer(Modifier.weight(1f))
-                FilterChip(
-                    selected = previewSmsMode,
-                    onClick = { previewSmsMode = !previewSmsMode },
-                    label = { Text(if (previewSmsMode) "پیامک فشرده" else "متن کامل") }
-                )
-            }
-
+            Text("گزارش تجمیعی کل روز (تفکیک کل روز و زنگ‌ها بدون تکرار)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             val previewText = when {
                 report == null -> "در حال آماده‌سازی..."
                 previewSmsMode -> report.smsText
                 else -> report.fullText
             }
-
             Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
                 Text(previewText, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(14.dp))
             }
-
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { report?.let { onSendSms(principalPhone, it.smsText) } }, enabled = report != null, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.Sms, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("پیامک عادی")
+                    Icon(Icons.Rounded.Sms, null); Spacer(Modifier.width(4.dp)); Text("پیامک کل روز")
                 }
                 FilledTonalButton(onClick = { report?.let { onShareText(it.fullText) } }, enabled = report != null, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.Send, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("ارسال متن")
+                    Icon(Icons.Rounded.Send, null); Spacer(Modifier.width(4.dp)); Text("ارسال متن")
                 }
-                OutlinedButton(onClick = { onCopyText(previewText) }, enabled = report != null) {
-                    Icon(Icons.Rounded.ContentCopy, contentDescription = "کپی")
-                }
+                OutlinedButton(onClick = { onCopyText(previewText) }, enabled = report != null) { Icon(Icons.Rounded.ContentCopy, "کپی") }
             }
 
             HorizontalDivider()
 
             Text("خروجی اکسل، CSV و فایل نمونه", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = onExportExcel, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.TableChart, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("اکسل (.xlsx)")
-                }
-                OutlinedButton(onClick = onExportCsv, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.Description, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("فایل CSV")
-                }
+                FilledTonalButton(onClick = onExportExcel, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.TableChart, null); Spacer(Modifier.width(4.dp)); Text("اکسل (.xlsx)") }
+                OutlinedButton(onClick = onExportCsv, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.Description, null); Spacer(Modifier.width(4.dp)); Text("فایل CSV") }
             }
             OutlinedButton(onClick = onExportTemplateExcel, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Rounded.Download, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text("دریافت فایل نمونه Excel (XLSX)")
+                Icon(Icons.Rounded.Download, null); Spacer(Modifier.width(6.dp)); Text("دریافت فایل نمونه Excel (XLSX)")
             }
 
             HorizontalDivider()
 
-            Text("پشتیبان‌گیری و بازیابی کامل (JSON)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text("پشتیبان‌گیری کلی (دانش‌آموزان، حضور و غیاب، نمرات و تنظیمات)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            if (backupStats != null) {
+                Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "${toPersianDigits(backupStats.studentsCount.toString())} دانش‌آموز • ${toPersianDigits(backupStats.classesCount.toString())} کلاس • ${toPersianDigits(backupStats.attendanceCount.toString())} رکورد حضور و غیاب • ${toPersianDigits(backupStats.scoresCount.toString())} نمره",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
+            }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = onExportBackupJson, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.Backup, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("دانلود پشتیبان")
+                Button(onClick = onSaveBackupToDevice, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Rounded.Save, null); Spacer(Modifier.width(4.dp)); Text("ذخیره در گوشی")
                 }
-                OutlinedButton(onClick = onRestoreBackupJson, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.Restore, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("بازیابی JSON")
+                FilledTonalButton(onClick = onShareBackupJson, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Rounded.Backup, null); Spacer(Modifier.width(4.dp)); Text("ارسال پشتیبان")
                 }
+            }
+            OutlinedButton(onClick = onRestoreBackupJson, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Rounded.Restore, null); Spacer(Modifier.width(6.dp)); Text("بازیابی کامل از فایل پشتیبان (JSON)")
             }
         }
     }
@@ -2049,6 +1970,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ir.hozoor.app.ui.components.ClassCategorySelector
 import ir.hozoor.app.ui.components.toPersianDigits
 import ir.hozoor.app.ui.theme.StatusColors
 import uniffi.hozoor_core.ClassAnalytics
@@ -2057,8 +1979,18 @@ import uniffi.hozoor_core.MonthlyStudentStat
 import uniffi.hozoor_core.TopStudentCount
 import java.util.Locale
 
+/** کادر دسته‌بندی کلاس‌ها داخل LazyColumn قرار گرفته تا با اسکرول بالا برود و مزاحم خواندن گزارش نباشد */
 @Composable
 fun MonthlyReportContent(
+    majors: List<String>,
+    selectedMajor: String,
+    grades: List<String>,
+    selectedGrade: String,
+    sections: List<Int>,
+    selectedSection: Int,
+    onSelectMajor: (String) -> Unit,
+    onSelectGrade: (String) -> Unit,
+    onSelectSection: (Int) -> Unit,
     analytics: ClassAnalytics?,
     report: MonthlyClassReport?,
     sortByAbsence: Boolean,
@@ -2076,10 +2008,23 @@ fun MonthlyReportContent(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 32.dp, top = 4.dp),
+        contentPadding = PaddingValues(bottom = 36.dp, top = 2.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // بخش ۱: آمار کلی کلاس + بیشترین غیبت، تأخیر و غیبت موجه (مطابق index.html)
+        item(key = "monthly_category_selector") {
+            ClassCategorySelector(
+                majors = majors,
+                selectedMajor = selectedMajor,
+                grades = grades,
+                selectedGrade = selectedGrade,
+                sections = sections,
+                selectedSection = selectedSection,
+                onSelectMajor = onSelectMajor,
+                onSelectGrade = onSelectGrade,
+                onSelectSection = onSelectSection
+            )
+        }
+
         if (analytics != null) {
             item(key = "class_analytics") {
                 Surface(
@@ -2105,7 +2050,6 @@ fun MonthlyReportContent(
             }
         }
 
-        // بخش ۲: انتخابگر ماه شمسی و خروجی ماهانه
         item(key = "monthly_header") {
             Surface(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -2113,49 +2057,25 @@ fun MonthlyReportContent(
                 color = MaterialTheme.colorScheme.surfaceContainerHigh
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        IconButton(onClick = { onShiftMonth(-1) }) {
-                            Icon(Icons.Rounded.ChevronRight, contentDescription = "ماه قبل")
-                        }
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        IconButton(onClick = { onShiftMonth(-1) }) { Icon(Icons.Rounded.ChevronRight, "ماه قبل") }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(report?.monthLabel ?: "—", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                            Text(
-                                text = "روزهای ثبت‌شده: ${toPersianDigits((report?.recordedDays ?: 0).toString())} روز",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Text("روزهای ثبت‌شده: ${toPersianDigits((report?.recordedDays ?: 0).toString())} روز", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        IconButton(onClick = { onShiftMonth(1) }) {
-                            Icon(Icons.Rounded.ChevronLeft, contentDescription = "ماه بعد")
-                        }
+                        IconButton(onClick = { onShiftMonth(1) }) { Icon(Icons.Rounded.ChevronLeft, "ماه بعد") }
                     }
-
                     Spacer(Modifier.height(10.dp))
-
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
                         MonthlyKpi("میانگین حضور", "${toPersianDigits(String.format(Locale.US, "%.1f", report?.averageAttendancePercent ?: 100.0))}٪", StatusColors.Present)
                         MonthlyKpi("غیبت کل روز", toPersianDigits((report?.totalFullAbsentDays ?: 0).toString()), StatusColors.Absent)
                         MonthlyKpi("زنگ غیبت", toPersianDigits((report?.totalAbsentPeriods ?: 0).toString()), StatusColors.Late)
                     }
-
                     Spacer(Modifier.height(12.dp))
-
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        FilledTonalButton(onClick = onExportExcel, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Rounded.TableChart, contentDescription = null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("اکسل ماهانه")
-                        }
-                        OutlinedButton(onClick = onExportCsv, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Rounded.Description, contentDescription = null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("CSV ماهانه")
-                        }
-                        FilterChip(selected = sortByAbsence, onClick = onToggleSort, label = { Icon(Icons.Rounded.Sort, contentDescription = "مرتب‌سازی") })
+                        FilledTonalButton(onClick = onExportExcel, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.TableChart, null); Spacer(Modifier.width(4.dp)); Text("اکسل ماهانه") }
+                        OutlinedButton(onClick = onExportCsv, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.Description, null); Spacer(Modifier.width(4.dp)); Text("CSV ماهانه") }
+                        FilterChip(selected = sortByAbsence, onClick = onToggleSort, label = { Icon(Icons.Rounded.Sort, "مرتب‌سازی") })
                     }
                 }
             }
@@ -2165,14 +2085,13 @@ fun MonthlyReportContent(
             MonthlyStudentCard(index = idx + 1, stat = stat)
         }
 
-        // دکمه امن حذف کل این کلاس
         item(key = "delete_class_footer") {
             OutlinedButton(
                 onClick = onRequestDeleteClass,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Icon(Icons.Rounded.DeleteSweep, contentDescription = null)
+                Icon(Icons.Rounded.DeleteSweep, null)
                 Spacer(Modifier.width(6.dp))
                 Text("حذف کامل این کلاس و سوابقش")
             }
@@ -2184,14 +2103,11 @@ fun MonthlyReportContent(
 private fun TopRankingBox(title: String, items: List<TopStudentCount>, accent: Color) {
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.ExtraBold, color = accent)
-        if (items.isEmpty()) {
-            Text("موردی ثبت نشده است.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            items.forEachIndexed { idx, row ->
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${toPersianDigits((idx + 1).toString())}. ${row.fullName}", style = MaterialTheme.typography.bodyMedium)
-                    Text("${toPersianDigits(row.count.toString())} مورد", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = accent)
-                }
+        if (items.isEmpty()) Text("موردی ثبت نشده است.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        else items.forEachIndexed { idx, row ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("${toPersianDigits((idx + 1).toString())}. ${row.fullName}", style = MaterialTheme.typography.bodyMedium)
+                Text("${toPersianDigits(row.count.toString())} مورد", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = accent)
             }
         }
     }
@@ -2213,25 +2129,14 @@ private fun MonthlyStudentCard(index: Int, stat: MonthlyStudentStat) {
         stat.attendancePercent >= 75.0 -> StatusColors.Late
         else -> StatusColors.Absent
     }
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow
-    ) {
+    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "${toPersianDigits(index.toString())}. ${stat.firstName} ${stat.lastName}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = "${toPersianDigits(String.format(Locale.US, "%.1f", stat.attendancePercent))}٪",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = barColor
-                )
+                Text("${toPersianDigits(index.toString())}. ${stat.firstName} ${stat.lastName}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                if (stat.classScore.isNotBlank()) {
+                    Text("نمره ${toPersianDigits(stat.classScore)}  ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary, fontWeight = FontWeight.Bold)
+                }
+                Text("${toPersianDigits(String.format(Locale.US, "%.1f", stat.attendancePercent))}٪", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, color = barColor)
             }
             Spacer(Modifier.height(6.dp))
             LinearProgressIndicator(progress = { pct }, color = barColor, modifier = Modifier.fillMaxWidth().height(6.dp))
@@ -2255,7 +2160,12 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -2319,6 +2229,7 @@ import ir.hozoor.app.ui.components.ExportAndReportSheet
 import ir.hozoor.app.ui.components.ExpressiveAttendanceToolbar
 import ir.hozoor.app.ui.components.JalaliDatePickerDialog
 import ir.hozoor.app.ui.components.PeriodSelector
+import ir.hozoor.app.ui.components.QuickScoreDialog
 import ir.hozoor.app.ui.components.StudentAttendanceCard
 import ir.hozoor.app.ui.components.StudentEditDialog
 import ir.hozoor.app.ui.components.toPersianDigits
@@ -2351,14 +2262,27 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
     var showTeacherPanel by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
     var editingStudent by remember { mutableStateOf<StudentAttendanceRow?>(null) }
+    var scoringStudent by remember { mutableStateOf<StudentAttendanceRow?>(null) }
     var deletingStudent by remember { mutableStateOf<StudentAttendanceRow?>(null) }
     var showDeleteClassDialog by remember { mutableStateOf(false) }
+    var pendingBackupBytes by remember { mutableStateOf<ByteArray?>(null) }
 
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
         val name = FileShareHelper.resolveFileName(context, uri)
         context.contentResolver.openInputStream(uri)?.use { stream ->
-            viewModel.importFileBytes(fileName = name, bytes = stream.readBytes(), replaceExisting = false)
+            viewModel.importFileBytes(fileName = name, bytes = stream.readBytes(), replaceExisting = true)
+        }
+    }
+
+    val saveBackupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+        val bytes = pendingBackupBytes
+        pendingBackupBytes = null
+        if (uri != null && bytes != null) {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                viewModel.showMessage("فایل پشتیبان کامل با موفقیت در گوشی ذخیره شد")
+            }.onFailure { viewModel.showMessage("خطا در ذخیره پشتیبان") }
         }
     }
 
@@ -2376,278 +2300,180 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { innerPadding ->
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }, containerColor = MaterialTheme.colorScheme.background) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // هدر عمومی + نام مدرسه فعال + تغییر تم (تاریک/روشن) و رنگ پویا (Dynamic Color)
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                // هدر عمومی + نام آموزشگاه از فایل ورودی + Dynamic Color + تاریک/روشن
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = state.selectedSchool.ifBlank { "سامانه حضور و غیاب" },
+                            text = state.selectedClass?.schoolName?.ifBlank { "سامانه حضور و غیاب" } ?: "سامانه حضور و غیاب",
                             style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onBackground
+                            fontWeight = FontWeight.ExtraBold
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
-                                text = state.jalaliDate,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            )
-                            if (state.classes.isNotEmpty() && state.activeTab == 0) {
-                                Text(
-                                    text = if (state.isPeriodSaved) "• ثبت‌شده" else "• پیش‌فرض حاضر",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (state.isPeriodSaved) StatusColors.Present else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                        Text(state.jalaliDate, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     }
-
-                    // دکمه رنگ پویا (Dynamic Color در اندروید ۱۲ به بالا)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         FilledTonalIconButton(onClick = viewModel::toggleDynamicColor) {
-                            Icon(
-                                imageVector = Icons.Rounded.Palette,
-                                contentDescription = "رنگ پویا (Dynamic Color)",
-                                tint = if (state.dynamicColorEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Icon(Icons.Rounded.Palette, "رنگ پویا", tint = if (state.dynamicColorEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Spacer(Modifier.width(4.dp))
                     }
-
-                    // دکمه تغییر حالت تاریک / روشن
                     FilledTonalIconButton(onClick = { viewModel.toggleDarkMode(isDarkTheme) }) {
-                        Icon(
-                            imageVector = if (isDarkTheme) Icons.Rounded.LightMode else Icons.Rounded.DarkMode,
-                            contentDescription = "تغییر حالت تاریک یا روشن"
-                        )
+                        Icon(if (isDarkTheme) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, "حالت تاریک یا روشن")
                     }
                 }
 
-                // نوار سریع تاریخ شمسی + پنل مشخصات دبیر/درس
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    FilledTonalButton(
-                        onClick = { showDatePicker = true },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Rounded.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
+                // نوار تقویم شمسی و پنل مشخصات دبیر/درس
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilledTonalButton(onClick = { showDatePicker = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Rounded.CalendarMonth, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("تقویم شمسی", maxLines = 1)
                     }
-                    IconButton(onClick = { viewModel.shiftDate(-1) }) {
-                        Icon(Icons.Rounded.ChevronRight, contentDescription = "روز قبل")
-                    }
-                    IconButton(onClick = { viewModel.shiftDate(1) }) {
-                        Icon(Icons.Rounded.ChevronLeft, contentDescription = "روز بعد")
-                    }
-                    OutlinedButton(
-                        onClick = { showTeacherPanel = !showTeacherPanel },
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
+                    IconButton(onClick = { viewModel.shiftDate(-1) }) { Icon(Icons.Rounded.ChevronRight, "روز قبل") }
+                    IconButton(onClick = { viewModel.shiftDate(1) }) { Icon(Icons.Rounded.ChevronLeft, "روز بعد") }
+                    OutlinedButton(onClick = { showTeacherPanel = !showTeacherPanel }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)) {
                         Text("دبیر و درس")
-                        Icon(if (showTeacherPanel) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = null)
+                        Icon(if (showTeacherPanel) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null)
                     }
                 }
 
-                // پنل بازشو مشخصات دبیر، درس، شماره مدیر و ساعت کلاس
                 AnimatedVisibility(visible = showTeacherPanel) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow
-                    ) {
+                    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = state.teacherName,
-                                    onValueChange = viewModel::updateTeacherName,
-                                    label = { Text("نام دبیر") },
-                                    singleLine = true,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                OutlinedTextField(
-                                    value = state.lessonName,
-                                    onValueChange = viewModel::updateLessonName,
-                                    label = { Text("نام درس") },
-                                    singleLine = true,
-                                    modifier = Modifier.weight(1f)
-                                )
+                                OutlinedTextField(value = state.teacherName, onValueChange = viewModel::updateTeacherName, label = { Text("نام دبیر") }, singleLine = true, modifier = Modifier.weight(1f))
+                                OutlinedTextField(value = state.lessonName, onValueChange = viewModel::updateLessonName, label = { Text("نام درس") }, singleLine = true, modifier = Modifier.weight(1f))
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = state.principalPhone,
-                                    onValueChange = viewModel::updatePrincipalPhone,
-                                    label = { Text("موبایل مدیر") },
-                                    singleLine = true,
-                                    modifier = Modifier.weight(1.4f)
-                                )
-                                OutlinedTextField(
-                                    value = state.classTime,
-                                    onValueChange = viewModel::updateClassTime,
-                                    label = { Text("ساعت") },
-                                    singleLine = true,
-                                    modifier = Modifier.weight(0.8f)
-                                )
+                                OutlinedTextField(value = state.principalPhone, onValueChange = viewModel::updatePrincipalPhone, label = { Text("موبایل مدیر") }, singleLine = true, modifier = Modifier.weight(1.4f))
+                                OutlinedTextField(value = state.classTime, onValueChange = viewModel::updateClassTime, label = { Text("ساعت") }, singleLine = true, modifier = Modifier.weight(0.8f))
                             }
                         }
                     }
                 }
 
-                // تب‌های حضور روزانه و آمار/گزارش ماهانه
                 if (state.classes.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(selected = state.activeTab == 0, onClick = { viewModel.switchTab(0) }, label = { Text("حضور و غیاب روزانه") }, modifier = Modifier.weight(1f))
                         FilterChip(selected = state.activeTab == 1, onClick = { viewModel.switchTab(1) }, label = { Text("آمار و گزارش ماهانه") }, modifier = Modifier.weight(1f))
                     }
                 }
 
                 when {
-                    state.isLoading -> {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
-                    }
-                    state.classes.isEmpty() -> {
-                        EmptyImportState(
-                            onImportClick = { filePicker.launch(IMPORT_MIME_TYPES) },
-                            onLoadSampleClick = {
-                                runCatching {
-                                    context.assets.open("sample_school.csv").use { s ->
-                                        viewModel.importFileBytes("sample_school.csv", s.readBytes(), true)
-                                    }
-                                }
-                            },
-                            onDownloadTemplate = {
-                                viewModel.exportTemplateExcel { name, bytes ->
-                                    FileShareHelper.shareBytesAsFile(
-                                        context, name,
-                                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                        bytes, "فایل نمونه Excel"
-                                    )
+                    state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
+                    state.classes.isEmpty() -> EmptyImportState(
+                        onImportClick = { filePicker.launch(IMPORT_MIME_TYPES) },
+                        onLoadSampleClick = {
+                            runCatching {
+                                context.assets.open("sample_school.csv").use { s ->
+                                    viewModel.importFileBytes("sample_school.csv", s.readBytes(), true)
                                 }
                             }
-                        )
-                    }
-                    state.activeTab == 1 -> {
-                        ClassCategorySelector(
-                            schools = state.schools,
-                            selectedSchool = state.selectedSchool,
-                            majors = state.majorsForSchool,
-                            selectedMajor = state.selectedMajor,
-                            grades = state.gradesForSelection,
-                            selectedGrade = state.selectedGrade,
-                            sections = state.sectionsForSelection,
-                            selectedSection = state.selectedSection,
-                            onSelectSchool = viewModel::selectSchool,
-                            onSelectMajor = viewModel::selectMajor,
-                            onSelectGrade = viewModel::selectGrade,
-                            onSelectSection = viewModel::selectSection
-                        )
-                        MonthlyReportContent(
-                            analytics = state.classAnalytics,
-                            report = state.monthlyReport,
-                            sortByAbsence = state.sortMonthlyByAbsence,
-                            onShiftMonth = viewModel::shiftJalaliMonth,
-                            onToggleSort = viewModel::toggleMonthlySort,
-                            onExportExcel = {
-                                viewModel.exportMonthlyExcel { name, bytes ->
-                                    FileShareHelper.shareBytesAsFile(context, name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bytes, "خروجی اکسل ماهانه")
-                                }
-                            },
-                            onExportCsv = {
-                                viewModel.exportMonthlyCsv { name, bytes ->
-                                    FileShareHelper.shareBytesAsFile(context, name, "text/csv", bytes, "خروجی CSV ماهانه")
-                                }
-                            },
-                            onRequestDeleteClass = { showDeleteClassDialog = true }
-                        )
-                    }
+                        },
+                        onDownloadTemplate = {
+                            viewModel.exportTemplateExcel { name, bytes ->
+                                FileShareHelper.shareBytesAsFile(context, name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bytes, "فایل نمونه Excel")
+                            }
+                        },
+                        onRestoreBackup = { backupRestorePicker.launch(arrayOf("application/json", "text/plain", "*/*")) }
+                    )
                     else -> {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = 104.dp, top = 2.dp)
-                        ) {
-                            // دسته‌بندی شبکه‌ای کلاس‌ها (اسکرول طبیعی با صفحه تا لیست دانش‌آموزان فضای کامل داشته باشد)
-                            item(key = "category_grid") {
-                                ClassCategorySelector(
-                                    schools = state.schools,
-                                    selectedSchool = state.selectedSchool,
-                                    majors = state.majorsForSchool,
+                        AnimatedContent(
+                            targetState = state.activeTab,
+                            transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(180)) },
+                            label = "tabSwitch"
+                        ) { tab ->
+                            if (tab == 1) {
+                                MonthlyReportContent(
+                                    majors = state.majors,
                                     selectedMajor = state.selectedMajor,
                                     grades = state.gradesForSelection,
                                     selectedGrade = state.selectedGrade,
                                     sections = state.sectionsForSelection,
                                     selectedSection = state.selectedSection,
-                                    onSelectSchool = viewModel::selectSchool,
                                     onSelectMajor = viewModel::selectMajor,
                                     onSelectGrade = viewModel::selectGrade,
-                                    onSelectSection = viewModel::selectSection
-                                )
-                            }
-
-                            item(key = "period_selector") {
-                                Spacer(Modifier.height(6.dp))
-                                PeriodSelector(selectedPeriod = state.selectedPeriod, onSelectPeriod = viewModel::selectPeriod)
-                                SummaryHeaderCard(summary = state.summary)
-                                OutlinedTextField(
-                                    value = state.searchQuery,
-                                    onValueChange = viewModel::updateSearch,
-                                    placeholder = { Text("جستجوی نام، نام خانوادگی، پدر یا کد ملی...") },
-                                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                                    singleLine = true,
-                                    shape = RoundedCornerShape(22.dp),
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
-                                )
-                            }
-
-                            itemsIndexed(
-                                items = state.students,
-                                key = { _, s -> s.studentId },
-                                contentType = { _, _ -> "student" }
-                            ) { idx, student ->
-                                StudentAttendanceCard(
-                                    indexInClass = idx + 1,
-                                    student = student,
-                                    onStatusChange = { viewModel.setStudentStatus(student.studentId, it) },
-                                    onCallParent = { phone ->
-                                        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
-                                    },
-                                    onSendIndividualNotice = { s, status ->
-                                        val statusText = if (status == AttendanceStatus.LATE) "با تأخیر حاضر شده است" else "غایب بوده است"
-                                        val pTitle = when (state.selectedPeriod) {
-                                            Period.FIRST -> "زنگ اول"
-                                            Period.SECOND -> "زنگ دوم"
-                                            Period.THIRD -> "زنگ سوم"
-                                            Period.FOURTH -> "زنگ چهارم"
+                                    onSelectSection = viewModel::selectSection,
+                                    analytics = state.classAnalytics,
+                                    report = state.monthlyReport,
+                                    sortByAbsence = state.sortMonthlyByAbsence,
+                                    onShiftMonth = viewModel::shiftJalaliMonth,
+                                    onToggleSort = viewModel::toggleMonthlySort,
+                                    onExportExcel = {
+                                        viewModel.exportMonthlyExcel { name, bytes ->
+                                            FileShareHelper.shareBytesAsFile(context, name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bytes, "خروجی اکسل ماهانه")
                                         }
-                                        val clsDesc = buildString {
-                                            append("پایه ${state.selectedGrade} شعبه ${toPersianDigits(state.selectedSection.toString())}")
-                                            if (state.selectedMajor.isNotBlank()) append(" رشته ${state.selectedMajor}")
-                                        }
-                                        val lessonDesc = if (state.lessonName.isNotBlank()) "در درس ${state.lessonName} " else ""
-                                        val teacherDesc = if (state.teacherName.isNotBlank()) " با دبیر محترم ${state.teacherName}" else ""
-                                        val body = "سلام علیکم، دانش‌آموز ${s.firstName} ${s.lastName}، فرزند ${s.fatherName.ifBlank { "ثبت نشده" }}، " +
-                                            "$clsDesc، ${lessonDesc}مورخه ${state.jalaliDate} ($pTitle ساعت ${toPersianDigits(state.classTime)})$teacherDesc $statusText."
-                                        val targetPhone = state.principalPhone.ifBlank { s.mobile }
-                                        FileShareHelper.openSmsApp(context, targetPhone, body)
                                     },
-                                    onEditStudent = { editingStudent = it },
-                                    onDeleteStudent = { deletingStudent = it }
+                                    onExportCsv = {
+                                        viewModel.exportMonthlyCsv { name, bytes ->
+                                            FileShareHelper.shareBytesAsFile(context, name, "text/csv", bytes, "خروجی CSV ماهانه")
+                                        }
+                                    },
+                                    onRequestDeleteClass = { showDeleteClassDialog = true }
                                 )
+                            } else {
+                                LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 104.dp, top = 2.dp)) {
+                                    item(key = "category_grid") {
+                                        ClassCategorySelector(
+                                            majors = state.majors,
+                                            selectedMajor = state.selectedMajor,
+                                            grades = state.gradesForSelection,
+                                            selectedGrade = state.selectedGrade,
+                                            sections = state.sectionsForSelection,
+                                            selectedSection = state.selectedSection,
+                                            onSelectMajor = viewModel::selectMajor,
+                                            onSelectGrade = viewModel::selectGrade,
+                                            onSelectSection = viewModel::selectSection
+                                        )
+                                    }
+                                    item(key = "period_and_search") {
+                                        Spacer(Modifier.height(6.dp))
+                                        PeriodSelector(selectedPeriod = state.selectedPeriod, onSelectPeriod = viewModel::selectPeriod)
+                                        SummaryHeaderCard(summary = state.summary)
+                                        OutlinedTextField(
+                                            value = state.searchQuery,
+                                            onValueChange = viewModel::updateSearch,
+                                            placeholder = { Text("جستجوی نام، نام خانوادگی، پدر یا کد ملی...") },
+                                            leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                                            singleLine = true,
+                                            shape = RoundedCornerShape(22.dp),
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                    itemsIndexed(items = state.students, key = { _, s -> s.studentId }, contentType = { _, _ -> "student" }) { idx, student ->
+                                        StudentAttendanceCard(
+                                            indexInClass = idx + 1,
+                                            student = student,
+                                            selectedPeriod = state.selectedPeriod,
+                                            onStatusChange = { viewModel.setStudentStatus(student.studentId, it) },
+                                            onCyclePeriodDot = { pIdx -> viewModel.cycleStudentPeriodStatus(student, pIdx) },
+                                            onCallParent = { phone -> context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))) },
+                                            onQuickScore = { scoringStudent = it },
+                                            onSendIndividualNotice = { s, status ->
+                                                val statusText = if (status == AttendanceStatus.LATE) "با تأخیر حاضر شده است" else "غایب بوده است"
+                                                val pTitle = when (state.selectedPeriod) {
+                                                    Period.FIRST -> "زنگ اول"
+                                                    Period.SECOND -> "زنگ دوم"
+                                                    Period.THIRD -> "زنگ سوم"
+                                                    Period.FOURTH -> "زنگ چهارم"
+                                                }
+                                                val clsDesc = buildString {
+                                                    append("پایه ${state.selectedGrade} شعبه ${toPersianDigits(state.selectedSection.toString())}")
+                                                    if (state.selectedMajor.isNotBlank()) append(" رشته ${state.selectedMajor}")
+                                                }
+                                                val lessonDesc = if (state.lessonName.isNotBlank()) "در درس ${state.lessonName} " else ""
+                                                val teacherDesc = if (state.teacherName.isNotBlank()) " با دبیر ${state.teacherName}" else ""
+                                                val body = "سلام علیکم، دانش‌آموز ${s.firstName} ${s.lastName}، فرزند ${s.fatherName.ifBlank { "ثبت نشده" }}، $clsDesc، ${lessonDesc}مورخه ${state.jalaliDate} ($pTitle ساعت ${toPersianDigits(state.classTime)})$teacherDesc $statusText."
+                                                val targetPhone = state.principalPhone.ifBlank { s.mobile }
+                                                FileShareHelper.openSmsApp(context, targetPhone, body)
+                                            },
+                                            onEditStudent = { editingStudent = it },
+                                            onDeleteStudent = { deletingStudent = it }
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -2661,7 +2487,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
                     onCopyFromPrevious = viewModel::copyFromPreviousPeriod,
                     onAddStudent = { showAddDialog = true },
                     onOpenExportSheet = {
-                        viewModel.preparePrincipalReport(false)
+                        viewModel.prepareExportSheet(false)
                         showExportSheet = true
                     },
                     onImportFile = { filePicker.launch(IMPORT_MIME_TYPES) },
@@ -2673,56 +2499,32 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
 
     if (showDatePicker) {
         val ym = remember(state.selectedDate) { viewModel.currentDateJalaliYearMonth() }
-        JalaliDatePickerDialog(
-            initialYear = ym.year,
-            initialMonth = ym.month,
-            selectedIso = state.selectedDate.toString(),
-            gridProvider = viewModel::getJalaliCalendarGrid,
-            onSelectIso = viewModel::selectDateIso,
-            onDismiss = { showDatePicker = false }
-        )
+        JalaliDatePickerDialog(ym.year, ym.month, state.selectedDate.toString(), viewModel::getJalaliCalendarGrid, viewModel::selectDateIso) { showDatePicker = false }
     }
-
     if (showAddDialog) {
-        StudentEditDialog(
-            editingStudent = null,
-            onSave = { f, l, fa, nid, mob -> viewModel.addStudentToCurrentClass(f, l, fa, nid, mob) },
-            onDismiss = { showAddDialog = false }
-        )
+        StudentEditDialog(null, { f, l, fa, nid, mob, sc -> viewModel.addStudentToCurrentClass(f, l, fa, nid, mob, sc) }) { showAddDialog = false }
     }
-
     editingStudent?.let { st ->
-        StudentEditDialog(
-            editingStudent = st,
-            onSave = { f, l, fa, nid, mob -> viewModel.updateStudent(st.studentId, f, l, fa, nid, mob) },
-            onDismiss = { editingStudent = null }
-        )
+        StudentEditDialog(st, { f, l, fa, nid, mob, sc -> viewModel.updateStudent(st.studentId, f, l, fa, nid, mob, sc) }) { editingStudent = null }
     }
-
+    scoringStudent?.let { st ->
+        QuickScoreDialog(st, { sc -> viewModel.saveStudentScore(st.studentId, sc) }) { scoringStudent = null }
+    }
     deletingStudent?.let { st ->
         AlertDialog(
             onDismissRequest = { deletingStudent = null },
             title = { Text("حذف دانش‌آموز") },
-            text = { Text("آیا «${st.firstName} ${st.lastName}» و تمام سوابق حضور و غیاب او حذف شوند؟") },
-            confirmButton = {
-                TextButton(onClick = { viewModel.deleteStudent(st.studentId); deletingStudent = null }) {
-                    Text("حذف", color = MaterialTheme.colorScheme.error)
-                }
-            },
+            text = { Text("آیا «${st.firstName} ${st.lastName}» و تمام سوابق او حذف شوند؟") },
+            confirmButton = { TextButton(onClick = { viewModel.deleteStudent(st.studentId); deletingStudent = null }) { Text("حذف", color = MaterialTheme.colorScheme.error) } },
             dismissButton = { TextButton(onClick = { deletingStudent = null }) { Text("انصراف") } }
         )
     }
-
     if (showDeleteClassDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteClassDialog = false },
             title = { Text("حذف کامل کلاس") },
-            text = { Text("تمام دانش‌آموزان و سوابق کلاس انتخاب‌شده حذف می‌شوند. سایر کلاس‌ها دست‌نخورده می‌مانند. ادامه می‌دهید؟") },
-            confirmButton = {
-                TextButton(onClick = { viewModel.deleteCurrentClass(); showDeleteClassDialog = false }) {
-                    Text("بله، حذف شود", color = MaterialTheme.colorScheme.error)
-                }
-            },
+            text = { Text("تمام دانش‌آموزان و سوابق این کلاس حذف می‌شوند. آیا مطمئن هستید؟") },
+            confirmButton = { TextButton(onClick = { viewModel.deleteCurrentClass(); showDeleteClassDialog = false }) { Text("حذف کلاس", color = MaterialTheme.colorScheme.error) } },
             dismissButton = { TextButton(onClick = { showDeleteClassDialog = false }) { Text("انصراف") } }
         )
     }
@@ -2730,11 +2532,18 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
     if (showExportSheet) {
         ExportAndReportSheet(
             report = state.principalReport,
+            summary = state.summary,
+            backupStats = state.backupStats,
             wholeSchool = state.reportWholeSchool,
             principalPhone = state.principalPhone,
-            onToggleWholeSchool = { viewModel.preparePrincipalReport(it) },
+            feedbackMessage = state.sheetFeedback,
+            onToggleWholeSchool = { viewModel.prepareExportSheet(it) },
             onPrincipalPhoneChange = viewModel::updatePrincipalPhone,
-            onSendSms = { phone, sms -> FileShareHelper.openSmsApp(context, phone, sms) },
+            onSendSms = { phone, sms ->
+                if (!FileShareHelper.openSmsApp(context, phone, sms)) {
+                    viewModel.setSheetFeedback("برنامه پیامک باز نشد؛ متن را کپی کنید.")
+                }
+            },
             onShareText = { txt -> FileShareHelper.shareText(context, txt, "ارسال گزارش به مدیر") },
             onCopyText = { txt ->
                 FileShareHelper.copyToClipboard(context, "گزارش مدیر", txt)
@@ -2743,7 +2552,9 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
             },
             onSendGroupPeriodSms = { status ->
                 viewModel.generatePeriodGroupMessage(status) { msg ->
-                    FileShareHelper.openSmsApp(context, state.principalPhone, msg)
+                    if (!FileShareHelper.openSmsApp(context, state.principalPhone, msg)) {
+                        viewModel.setSheetFeedback("برنامه پیامک در این گوشی پیدا نشد.")
+                    }
                 }
             },
             onSendGroupPeriodShare = { status ->
@@ -2766,9 +2577,15 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
                     FileShareHelper.shareBytesAsFile(context, name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bytes, "فایل نمونه Excel")
                 }
             },
-            onExportBackupJson = {
+            onSaveBackupToDevice = {
                 viewModel.exportBackupJson { name, bytes ->
-                    FileShareHelper.shareBytesAsFile(context, name, "application/json", bytes, "فایل پشتیبان JSON")
+                    pendingBackupBytes = bytes
+                    saveBackupLauncher.launch(name)
+                }
+            },
+            onShareBackupJson = {
+                viewModel.exportBackupJson { name, bytes ->
+                    FileShareHelper.shareBytesAsFile(context, name, "application/json", bytes, "پشتیبان کامل (JSON)")
                 }
             },
             onRestoreBackupJson = {
@@ -2782,15 +2599,8 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
 
 @Composable
 private fun SummaryHeaderCard(summary: PeriodSummary) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp, horizontal = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
+    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp, horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             MetricPill("کل", summary.total, MaterialTheme.colorScheme.primary)
             MetricPill("حاضر", summary.present, StatusColors.Present)
             MetricPill("غایب", summary.absent, StatusColors.Absent)
@@ -2812,34 +2622,23 @@ private fun MetricPill(label: String, count: Int, color: Color) {
 private fun EmptyImportState(
     onImportClick: () -> Unit,
     onLoadSampleClick: () -> Unit,
-    onDownloadTemplate: () -> Unit
+    onDownloadTemplate: () -> Unit,
+    onRestoreBackup: () -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
+    Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Text("سامانه حضور و غیاب آماده است", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(8.dp))
-        Text(
-            text = "فایل اکسل (.xlsx) یا CSV مدرسه خود را انتخاب کنید تا کلاس‌ها به‌صورت خودکار بر اساس رشته، پایه و شعبه دسته‌بندی شوند.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text("فایل اکسل (.xlsx) یا CSV را وارد کنید تا کلاس‌ها بر اساس رشته، پایه و شعبه دسته‌بندی شوند.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(20.dp))
         Button(onClick = onImportClick, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Rounded.UploadFile, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("انتخاب فایل اکسل یا CSV")
+            Icon(Icons.Rounded.UploadFile, null); Spacer(Modifier.width(8.dp)); Text("انتخاب فایل اکسل یا CSV")
         }
         Spacer(Modifier.height(8.dp))
-        FilledTonalButton(onClick = onLoadSampleClick, modifier = Modifier.fillMaxWidth()) {
-            Text("تست سریع با داده‌های نمونه")
-        }
+        FilledTonalButton(onClick = onLoadSampleClick, modifier = Modifier.fillMaxWidth()) { Text("تست سریع با داده‌های نمونه") }
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onDownloadTemplate, modifier = Modifier.fillMaxWidth()) {
-            Text("دریافت فایل نمونه Excel (XLSX)")
-        }
+        OutlinedButton(onClick = onDownloadTemplate, modifier = Modifier.fillMaxWidth()) { Text("دریافت فایل نمونه Excel (XLSX)") }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = onRestoreBackup, modifier = Modifier.fillMaxWidth()) { Text("بازیابی از پشتیبان قبلی (JSON)") }
     }
 }
 ''',
@@ -2847,12 +2646,12 @@ private fun EmptyImportState(
 
 
 def main():
-    for rel_path, content in FILES.items():
-        path = Path(rel_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8", newline="\n")
-        print(f"Created: {rel_path}")
-    print(f"\nPart 2 (Android Kotlin UI) done: {len(FILES)} files.")
+    for rel, content in FILES.items():
+        p = Path(rel)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8", newline="\n")
+        print(f"Created: {rel}")
+    print(f"\nPart 2 (Android Kotlin UI v3.0) done: {len(FILES)} files.")
 
 
 if __name__ == "__main__":

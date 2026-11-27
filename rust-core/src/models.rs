@@ -80,7 +80,7 @@ impl AttendanceStatus {
 
     pub fn label_fa(self) -> &'static str {
         match self {
-            AttendanceStatus::Unmarked => "ثبت‌نشده",
+            AttendanceStatus::Unmarked => "حاضر",
             AttendanceStatus::Present => "حاضر",
             AttendanceStatus::Absent => "غایب",
             AttendanceStatus::Late => "تأخیر",
@@ -109,6 +109,8 @@ pub struct StudentAttendanceRow {
     pub mobile: String,
     pub current_status: AttendanceStatus,
     pub period_statuses: Vec<AttendanceStatus>,
+    pub class_score: String,
+    pub session_score: String,
     pub note: String,
 }
 
@@ -147,6 +149,14 @@ pub struct PrincipalReportBundle {
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
+pub struct BackupStats {
+    pub students_count: i32,
+    pub classes_count: i32,
+    pub attendance_count: i32,
+    pub scores_count: i32,
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
 pub struct TopStudentCount {
     pub full_name: String,
     pub count: i32,
@@ -172,6 +182,7 @@ pub struct MonthlyStudentStat {
     pub father_name: String,
     pub national_id: String,
     pub mobile: String,
+    pub class_score: String,
     pub present_periods: i32,
     pub absent_periods: i32,
     pub full_absent_days: i32,

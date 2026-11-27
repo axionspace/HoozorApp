@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ir.hozoor.app.ui.components.ClassCategorySelector
 import ir.hozoor.app.ui.components.toPersianDigits
 import ir.hozoor.app.ui.theme.StatusColors
 import uniffi.hozoor_core.ClassAnalytics
@@ -46,8 +47,18 @@ import uniffi.hozoor_core.MonthlyStudentStat
 import uniffi.hozoor_core.TopStudentCount
 import java.util.Locale
 
+/** کادر دسته‌بندی کلاس‌ها داخل LazyColumn قرار گرفته تا با اسکرول بالا برود و مزاحم خواندن گزارش نباشد */
 @Composable
 fun MonthlyReportContent(
+    majors: List<String>,
+    selectedMajor: String,
+    grades: List<String>,
+    selectedGrade: String,
+    sections: List<Int>,
+    selectedSection: Int,
+    onSelectMajor: (String) -> Unit,
+    onSelectGrade: (String) -> Unit,
+    onSelectSection: (Int) -> Unit,
     analytics: ClassAnalytics?,
     report: MonthlyClassReport?,
     sortByAbsence: Boolean,
@@ -65,10 +76,23 @@ fun MonthlyReportContent(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 32.dp, top = 4.dp),
+        contentPadding = PaddingValues(bottom = 36.dp, top = 2.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // بخش ۱: آمار کلی کلاس + بیشترین غیبت، تأخیر و غیبت موجه (مطابق index.html)
+        item(key = "monthly_category_selector") {
+            ClassCategorySelector(
+                majors = majors,
+                selectedMajor = selectedMajor,
+                grades = grades,
+                selectedGrade = selectedGrade,
+                sections = sections,
+                selectedSection = selectedSection,
+                onSelectMajor = onSelectMajor,
+                onSelectGrade = onSelectGrade,
+                onSelectSection = onSelectSection
+            )
+        }
+
         if (analytics != null) {
             item(key = "class_analytics") {
                 Surface(
@@ -94,7 +118,6 @@ fun MonthlyReportContent(
             }
         }
 
-        // بخش ۲: انتخابگر ماه شمسی و خروجی ماهانه
         item(key = "monthly_header") {
             Surface(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -102,49 +125,25 @@ fun MonthlyReportContent(
                 color = MaterialTheme.colorScheme.surfaceContainerHigh
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        IconButton(onClick = { onShiftMonth(-1) }) {
-                            Icon(Icons.Rounded.ChevronRight, contentDescription = "ماه قبل")
-                        }
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                        IconButton(onClick = { onShiftMonth(-1) }) { Icon(Icons.Rounded.ChevronRight, "ماه قبل") }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(report?.monthLabel ?: "—", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                            Text(
-                                text = "روزهای ثبت‌شده: ${toPersianDigits((report?.recordedDays ?: 0).toString())} روز",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Text("روزهای ثبت‌شده: ${toPersianDigits((report?.recordedDays ?: 0).toString())} روز", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        IconButton(onClick = { onShiftMonth(1) }) {
-                            Icon(Icons.Rounded.ChevronLeft, contentDescription = "ماه بعد")
-                        }
+                        IconButton(onClick = { onShiftMonth(1) }) { Icon(Icons.Rounded.ChevronLeft, "ماه بعد") }
                     }
-
                     Spacer(Modifier.height(10.dp))
-
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
                         MonthlyKpi("میانگین حضور", "${toPersianDigits(String.format(Locale.US, "%.1f", report?.averageAttendancePercent ?: 100.0))}٪", StatusColors.Present)
                         MonthlyKpi("غیبت کل روز", toPersianDigits((report?.totalFullAbsentDays ?: 0).toString()), StatusColors.Absent)
                         MonthlyKpi("زنگ غیبت", toPersianDigits((report?.totalAbsentPeriods ?: 0).toString()), StatusColors.Late)
                     }
-
                     Spacer(Modifier.height(12.dp))
-
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        FilledTonalButton(onClick = onExportExcel, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Rounded.TableChart, contentDescription = null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("اکسل ماهانه")
-                        }
-                        OutlinedButton(onClick = onExportCsv, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Rounded.Description, contentDescription = null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("CSV ماهانه")
-                        }
-                        FilterChip(selected = sortByAbsence, onClick = onToggleSort, label = { Icon(Icons.Rounded.Sort, contentDescription = "مرتب‌سازی") })
+                        FilledTonalButton(onClick = onExportExcel, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.TableChart, null); Spacer(Modifier.width(4.dp)); Text("اکسل ماهانه") }
+                        OutlinedButton(onClick = onExportCsv, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.Description, null); Spacer(Modifier.width(4.dp)); Text("CSV ماهانه") }
+                        FilterChip(selected = sortByAbsence, onClick = onToggleSort, label = { Icon(Icons.Rounded.Sort, "مرتب‌سازی") })
                     }
                 }
             }
@@ -154,14 +153,13 @@ fun MonthlyReportContent(
             MonthlyStudentCard(index = idx + 1, stat = stat)
         }
 
-        // دکمه امن حذف کل این کلاس
         item(key = "delete_class_footer") {
             OutlinedButton(
                 onClick = onRequestDeleteClass,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Icon(Icons.Rounded.DeleteSweep, contentDescription = null)
+                Icon(Icons.Rounded.DeleteSweep, null)
                 Spacer(Modifier.width(6.dp))
                 Text("حذف کامل این کلاس و سوابقش")
             }
@@ -173,14 +171,11 @@ fun MonthlyReportContent(
 private fun TopRankingBox(title: String, items: List<TopStudentCount>, accent: Color) {
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.ExtraBold, color = accent)
-        if (items.isEmpty()) {
-            Text("موردی ثبت نشده است.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            items.forEachIndexed { idx, row ->
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${toPersianDigits((idx + 1).toString())}. ${row.fullName}", style = MaterialTheme.typography.bodyMedium)
-                    Text("${toPersianDigits(row.count.toString())} مورد", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = accent)
-                }
+        if (items.isEmpty()) Text("موردی ثبت نشده است.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        else items.forEachIndexed { idx, row ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("${toPersianDigits((idx + 1).toString())}. ${row.fullName}", style = MaterialTheme.typography.bodyMedium)
+                Text("${toPersianDigits(row.count.toString())} مورد", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = accent)
             }
         }
     }
@@ -202,25 +197,14 @@ private fun MonthlyStudentCard(index: Int, stat: MonthlyStudentStat) {
         stat.attendancePercent >= 75.0 -> StatusColors.Late
         else -> StatusColors.Absent
     }
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow
-    ) {
+    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "${toPersianDigits(index.toString())}. ${stat.firstName} ${stat.lastName}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = "${toPersianDigits(String.format(Locale.US, "%.1f", stat.attendancePercent))}٪",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = barColor
-                )
+                Text("${toPersianDigits(index.toString())}. ${stat.firstName} ${stat.lastName}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                if (stat.classScore.isNotBlank()) {
+                    Text("نمره ${toPersianDigits(stat.classScore)}  ", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary, fontWeight = FontWeight.Bold)
+                }
+                Text("${toPersianDigits(String.format(Locale.US, "%.1f", stat.attendancePercent))}٪", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, color = barColor)
             }
             Spacer(Modifier.height(6.dp))
             LinearProgressIndicator(progress = { pct }, color = barColor, modifier = Modifier.fillMaxWidth().height(6.dp))

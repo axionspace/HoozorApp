@@ -36,17 +36,9 @@ fun ExpressiveAttendanceToolbar(
             }
         }
     ) {
-        IconButton(onClick = onResetAllPresent) {
-            Icon(Icons.Rounded.DoneAll, contentDescription = "همه حاضر")
-        }
-        IconButton(onClick = onCopyFromPrevious, enabled = selectedPeriod != Period.FIRST) {
-            Icon(Icons.Rounded.ContentCopy, contentDescription = "کپی از زنگ قبل")
-        }
-        IconButton(onClick = onAddStudent) {
-            Icon(Icons.Rounded.PersonAdd, contentDescription = "افزودن دانش‌آموز")
-        }
-        IconButton(onClick = onOpenExportSheet) {
-            Icon(Icons.Rounded.Share, contentDescription = "گزارش مدیر، خروجی و پشتیبان")
-        }
+        IconButton(onClick = onResetAllPresent) { Icon(Icons.Rounded.DoneAll, "همه حاضر") }
+        IconButton(onClick = onCopyFromPrevious, enabled = selectedPeriod != Period.FIRST) { Icon(Icons.Rounded.ContentCopy, "کپی زنگ قبل") }
+        IconButton(onClick = onAddStudent) { Icon(Icons.Rounded.PersonAdd, "افزودن دانش‌آموز") }
+        IconButton(onClick = onOpenExportSheet) { Icon(Icons.Rounded.Share, "گزارش مدیر، خروجی و پشتیبان") }
     }
 }
