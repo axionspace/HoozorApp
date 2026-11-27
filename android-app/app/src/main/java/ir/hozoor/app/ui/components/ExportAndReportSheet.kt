@@ -1,31 +1,45 @@
 package ir.hozoor.app.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.BookmarkAdd
+import androidx.compose.material.icons.rounded.Chat
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Contacts
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Grade
 import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.Restore
+import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.Sms
 import androidx.compose.material.icons.rounded.TableChart
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -33,154 +47,271 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ir.hozoor.app.ui.theme.StatusColors
 import uniffi.hozoor_core.AttendanceStatus
+import uniffi.hozoor_core.BackupStats
+import uniffi.hozoor_core.PeriodSummary
 import uniffi.hozoor_core.PrincipalReportBundle
+import uniffi.hozoor_core.SavedContact
+import uniffi.hozoor_core.StudentAttendanceRow
 
+/** مرکز کامل ارسال و اشتراک‌گذاری: انتخاب از مخاطبین گوشی، ویرایش متن، پیامک، واتساپ، پیام‌رسان، اطلاع‌رسانی اولیا و پشتیبان */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportAndReportSheet(
     report: PrincipalReportBundle?,
+    summary: PeriodSummary,
+    students: List<StudentAttendanceRow>,
+    savedContacts: List<SavedContact>,
+    backupStats: BackupStats?,
     wholeSchool: Boolean,
-    principalPhone: String,
+    recipientName: String,
+    recipientPhone: String,
+    feedbackMessage: String?,
     onToggleWholeSchool: (Boolean) -> Unit,
-    onPrincipalPhoneChange: (String) -> Unit,
-    onSendSms: (phone: String, smsText: String) -> Unit,
+    onRecipientPhoneChange: (String) -> Unit,
+    onPickPhoneContact: () -> Unit,
+    onSelectSavedContact: (SavedContact) -> Unit,
+    onSaveCurrentContact: (name: String, phone: String) -> Unit,
+    onDeleteSavedContact: (Long) -> Unit,
+    onLoadPeriodGroupMessage: (AttendanceStatus, (String) -> Unit) -> Unit,
+    onSendSms: (phone: String, text: String) -> Unit,
+    onSendWhatsApp: (phone: String, text: String) -> Unit,
     onShareText: (String) -> Unit,
     onCopyText: (String) -> Unit,
-    onSendGroupPeriodSms: (AttendanceStatus) -> Unit,
-    onSendGroupPeriodShare: (AttendanceStatus) -> Unit,
-    onExportExcel: () -> Unit,
+    onNotifyParentSms: (StudentAttendanceRow) -> Unit,
+    onNotifyParentWhatsApp: (StudentAttendanceRow) -> Unit,
+    onExportDailyExcel: () -> Unit,
+    onExportGradebookExcel: () -> Unit,
     onExportCsv: () -> Unit,
     onExportTemplateExcel: () -> Unit,
-    onExportBackupJson: () -> Unit,
+    onSaveBackupToDevice: () -> Unit,
+    onShareBackupJson: () -> Unit,
     onRestoreBackupJson: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    var previewSmsMode by remember { mutableStateOf(false) }
+    // 0=گزارش کامل، 1=پیامک فشرده، 2=غایبین این زنگ، 3=تأخیری این زنگ، 4=خروج از کلاس
+    var msgMode by remember { mutableIntStateOf(0) }
+    var editableText by remember { mutableStateOf("") }
+    var contactLabel by remember(recipientName) { mutableStateOf(recipientName.ifBlank { "مدیر" }) }
+
+    LaunchedEffect(report, msgMode) {
+        when (msgMode) {
+            0 -> editableText = report?.fullText.orEmpty()
+            1 -> editableText = report?.smsText.orEmpty()
+        }
+    }
+
+    val flaggedStudents = remember(students) {
+        students.filter { it.currentStatus in listOf(AttendanceStatus.ABSENT, AttendanceStatus.LATE, AttendanceStatus.LeftClass) && it.mobile.isNotBlank() }
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp)
-                .verticalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 28.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("گزارش مدیر، خروجی و پشتیبان‌گیری", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+            Text("مرکز ارسال، مخاطبین و خروجی", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
 
+            AnimatedVisibility(visible = !feedbackMessage.isNullOrBlank()) {
+                Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
+                    Text(feedbackMessage.orEmpty(), color = MaterialTheme.colorScheme.onErrorContainer, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(10.dp))
+                }
+            }
+
+            // ۱) بخش انتخاب مخاطب از گوشی و مخاطبین ذخیره‌شده
+            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("گیرنده پیام", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+                        FilledTonalButton(onClick = onPickPhoneContact, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) {
+                            Icon(Icons.Rounded.Contacts, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(5.dp))
+                            Text("از مخاطبین گوشی", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+
+                    if (savedContacts.isNotEmpty()) {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(savedContacts, key = { it.id }) { c ->
+                                InputChip(
+                                    selected = c.phone == recipientPhone,
+                                    onClick = { onSelectSavedContact(c) },
+                                    label = { Text("${c.name} (${toPersianDigits(c.phone.takeLast(4))})") },
+                                    trailingIcon = {
+                                        IconButton(onClick = { onDeleteSavedContact(c.id) }, modifier = Modifier.size(18.dp)) {
+                                            Icon(Icons.Rounded.Close, "حذف", modifier = Modifier.size(14.dp))
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = recipientPhone,
+                            onValueChange = onRecipientPhoneChange,
+                            label = { Text("شماره گیرنده") },
+                            placeholder = { Text("0917xxxxxxx") },
+                            leadingIcon = { Icon(Icons.Rounded.Phone, null) },
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.weight(1.3f)
+                        )
+                        OutlinedTextField(
+                            value = contactLabel,
+                            onValueChange = { contactLabel = it },
+                            label = { Text("نام") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.weight(0.8f)
+                        )
+                        IconButton(onClick = { onSaveCurrentContact(contactLabel, recipientPhone) }) {
+                            Icon(Icons.Rounded.BookmarkAdd, "ذخیره مخاطب", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            }
+
+            // ۲) انتخاب گستره و نوع گزارش
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(selected = !wholeSchool, onClick = { onToggleWholeSchool(false); msgMode = 0 }, label = { Text("کلاس فعلی") })
+                FilterChip(selected = wholeSchool, onClick = { onToggleWholeSchool(true); msgMode = 0 }, label = { Text("کل کلاس‌ها") })
+            }
+
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                item { FilterChip(selected = msgMode == 0, onClick = { msgMode = 0 }, label = { Text("گزارش کامل روز") }) }
+                item { FilterChip(selected = msgMode == 1, onClick = { msgMode = 1 }, label = { Text("پیامک فشرده روز") }) }
+                item {
+                    FilterChip(
+                        selected = msgMode == 2,
+                        onClick = { onLoadPeriodGroupMessage(AttendanceStatus.ABSENT) { txt -> msgMode = 2; editableText = txt } },
+                        label = { Text("غیبت این زنگ (${toPersianDigits(summary.absent.toString())})") }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = msgMode == 3,
+                        onClick = { onLoadPeriodGroupMessage(AttendanceStatus.LATE) { txt -> msgMode = 3; editableText = txt } },
+                        label = { Text("تأخیر (${toPersianDigits(summary.late.toString())})") }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = msgMode == 4,
+                        onClick = { onLoadPeriodGroupMessage(AttendanceStatus.LeftClass) { txt -> msgMode = 4; editableText = txt } },
+                        label = { Text("خروج از کلاس (${toPersianDigits(summary.leftClass.toString())})") }
+                    )
+                }
+            }
+
+            // کادر متن قابل ویرایش مستقیم قبل از ارسال
             OutlinedTextField(
-                value = principalPhone,
-                onValueChange = onPrincipalPhoneChange,
-                label = { Text("شماره موبایل مدیر (برای پیامک عادی)") },
-                placeholder = { Text("0917xxxxxxx") },
-                leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null) },
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
+                value = editableText,
+                onValueChange = { editableText = it },
+                label = { Text("متن آماده ارسال (قابل ویرایش دستی)") },
+                minLines = 4,
+                maxLines = 9,
+                shape = RoundedCornerShape(18.dp),
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Text("ارسال پیام گروهی همین زنگ به مدیر", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = { onSendGroupPeriodSms(AttendanceStatus.ABSENT) }, modifier = Modifier.weight(1f)) {
-                    Text("غیبت با پیامک")
+            // دکمه‌های ارسال چندکاناله: پیامک، واتساپ، پیام‌رسان‌ها، کپی
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Button(onClick = { onSendSms(recipientPhone, editableText) }, enabled = editableText.isNotBlank(), modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp)) {
+                    Icon(Icons.Rounded.Sms, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("پیامک عادی", maxLines = 1)
                 }
-                FilledTonalButton(onClick = { onSendGroupPeriodShare(AttendanceStatus.ABSENT) }, modifier = Modifier.weight(1f)) {
-                    Text("غیبت در پیام‌رسان")
-                }
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { onSendGroupPeriodSms(AttendanceStatus.LATE) }, modifier = Modifier.weight(1f)) {
-                    Text("تأخیر با پیامک")
-                }
-                OutlinedButton(onClick = { onSendGroupPeriodShare(AttendanceStatus.LATE) }, modifier = Modifier.weight(1f)) {
-                    Text("تأخیر در پیام‌رسان")
+                Button(
+                    onClick = { onSendWhatsApp(recipientPhone, editableText) },
+                    enabled = editableText.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A), contentColor = Color.White),
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp)
+                ) {
+                    Icon(Icons.Rounded.Chat, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("واتساپ", maxLines = 1)
                 }
             }
-
-            HorizontalDivider()
-
-            Text("گزارش تجمیعی کل روز (بدون تکرار کل روز در زنگ‌ها)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !wholeSchool, onClick = { onToggleWholeSchool(false) }, label = { Text("کلاس فعلی") })
-                FilterChip(selected = wholeSchool, onClick = { onToggleWholeSchool(true) }, label = { Text("کل مدرسه") })
-                Spacer(Modifier.weight(1f))
-                FilterChip(
-                    selected = previewSmsMode,
-                    onClick = { previewSmsMode = !previewSmsMode },
-                    label = { Text(if (previewSmsMode) "پیامک فشرده" else "متن کامل") }
-                )
-            }
-
-            val previewText = when {
-                report == null -> "در حال آماده‌سازی..."
-                previewSmsMode -> report.smsText
-                else -> report.fullText
-            }
-
-            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
-                Text(previewText, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(14.dp))
-            }
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { report?.let { onSendSms(principalPhone, it.smsText) } }, enabled = report != null, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.Sms, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("پیامک عادی")
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilledTonalButton(onClick = { onShareText(editableText) }, enabled = editableText.isNotBlank(), modifier = Modifier.weight(1.3f)) {
+                    Icon(Icons.Rounded.Send, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("شاد / ایتا / بله / سایر")
                 }
-                FilledTonalButton(onClick = { report?.let { onShareText(it.fullText) } }, enabled = report != null, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.Send, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("ارسال متن")
+                OutlinedButton(onClick = { onCopyText(editableText) }, enabled = editableText.isNotBlank(), modifier = Modifier.weight(0.7f)) {
+                    Icon(Icons.Rounded.ContentCopy, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("کپی")
                 }
-                OutlinedButton(onClick = { onCopyText(previewText) }, enabled = report != null) {
-                    Icon(Icons.Rounded.ContentCopy, contentDescription = "کپی")
+            }
+
+            // ۳) اطلاع‌رسانی سریع به اولیای دانش‌آموزان غایب/تأخیر/خروج
+            if (flaggedStudents.isNotEmpty()) {
+                HorizontalDivider()
+                Text("اطلاع‌رسانی مستقیم به اولیا (${toPersianDigits(flaggedStudents.size.toString())} نفر)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold)
+                flaggedStudents.forEach { st ->
+                    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
+                        Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("${st.firstName} ${st.lastName}", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = if (st.currentStatus == AttendanceStatus.LeftClass && st.exitTime.isNotBlank()) "خروج ${toPersianDigits(st.exitTime)}" else st.currentStatus.labelFa(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = statusPrimaryColor(st.currentStatus)
+                                )
+                            }
+                            IconButton(onClick = { onNotifyParentSms(st) }) { Icon(Icons.Rounded.Sms, "پیامک ولی", tint = MaterialTheme.colorScheme.primary) }
+                            IconButton(onClick = { onNotifyParentWhatsApp(st) }) { Icon(Icons.Rounded.Chat, "واتساپ ولی", tint = Color(0xFF16A34A)) }
+                        }
+                    }
                 }
             }
 
             HorizontalDivider()
 
-            Text("خروجی اکسل، CSV و فایل نمونه", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            // ۴) فایل‌های اکسل و CSV
+            Text("خروجی اکسل و CSV", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = onExportExcel, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.TableChart, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("اکسل (.xlsx)")
-                }
-                OutlinedButton(onClick = onExportCsv, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.Description, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("فایل CSV")
-                }
+                FilledTonalButton(onClick = onExportDailyExcel, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.TableChart, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("اکسل حضور") }
+                FilledTonalButton(onClick = onExportGradebookExcel, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.Grade, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("اکسل نمرات") }
             }
-            OutlinedButton(onClick = onExportTemplateExcel, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Rounded.Download, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text("دریافت فایل نمونه Excel (XLSX)")
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onExportCsv, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.Description, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("فایل CSV") }
+                OutlinedButton(onClick = onExportTemplateExcel, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.Download, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("نمونه اکسل") }
             }
 
             HorizontalDivider()
 
-            Text("پشتیبان‌گیری و بازیابی کامل (JSON)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = onExportBackupJson, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.Backup, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("دانلود پشتیبان")
-                }
-                OutlinedButton(onClick = onRestoreBackupJson, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.Restore, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("بازیابی JSON")
+            // ۵) پشتیبان‌گیری کلی از تمام اطلاعات
+            Text("پشتیبان‌گیری کلی (دانش‌آموزان، حضور، خروج، نمرات و مخاطبین)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            if (backupStats != null) {
+                Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "${toPersianDigits(backupStats.studentsCount.toString())} دانش‌آموز • ${toPersianDigits(backupStats.attendanceCount.toString())} حضور • ${toPersianDigits(backupStats.gradesCount.toString())} نمره • ${toPersianDigits(backupStats.contactsCount.toString())} مخاطب",
+                        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(10.dp)
+                    )
                 }
             }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onSaveBackupToDevice, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.Save, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("ذخیره در گوشی") }
+                FilledTonalButton(onClick = onShareBackupJson, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.Backup, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("ارسال پشتیبان") }
+            }
+            OutlinedButton(onClick = onRestoreBackupJson, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Rounded.Restore, null); Spacer(Modifier.width(6.dp)); Text("بازیابی کامل از پشتیبان JSON") }
         }
     }
+}
+
+private fun AttendanceStatus.labelFa(): String = when (this) {
+    AttendanceStatus.ABSENT -> "غایب"
+    AttendanceStatus.LATE -> "تأخیر"
+    AttendanceStatus.EXCUSED -> "موجه"
+    AttendanceStatus.LeftClass -> "خروج از کلاس"
+    else -> "حاضر"
 }

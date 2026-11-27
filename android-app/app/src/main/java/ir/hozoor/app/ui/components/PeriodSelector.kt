@@ -1,6 +1,7 @@
 package ir.hozoor.app.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,15 +32,11 @@ private val ALL_PERIODS = listOf(
     Period.FOURTH to "زنگ ۴"
 )
 
+/** رفع کامل مشکل ناپدید شدن عدد زنگ کنار آیکون با تنظیم دقیق padding داخلی */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun PeriodSelector(
-    selectedPeriod: Period,
-    onSelectPeriod: (Period) -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun PeriodSelector(selectedPeriod: Period, onSelectPeriod: (Period) -> Unit, modifier: Modifier = Modifier) {
     val haptic = LocalHapticFeedback.current
-
     Row(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)
@@ -51,7 +48,6 @@ fun PeriodSelector(
                 ALL_PERIODS.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                 else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
             }
-
             ToggleButton(
                 checked = checked,
                 onCheckedChange = {
@@ -60,6 +56,7 @@ fun PeriodSelector(
                 },
                 modifier = Modifier.weight(1f),
                 shapes = shapes,
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
                 colors = ToggleButtonDefaults.toggleButtonColors(
                     checkedContainerColor = MaterialTheme.colorScheme.primary,
                     checkedContentColor = MaterialTheme.colorScheme.onPrimary,
@@ -68,14 +65,15 @@ fun PeriodSelector(
                 )
             ) {
                 if (checked) {
-                    Icon(Icons.Rounded.NotificationsActive, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
+                    Icon(Icons.Rounded.NotificationsActive, null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(2.dp))
                 }
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (checked) FontWeight.ExtraBold else FontWeight.Medium,
-                    maxLines = 1
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (checked) FontWeight.ExtraBold else FontWeight.SemiBold,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }

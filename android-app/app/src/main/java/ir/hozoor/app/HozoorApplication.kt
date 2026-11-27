@@ -10,7 +10,6 @@ class HozoorApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        val dbFile = File(filesDir, "hozoor_attendance.db")
-        engine = AttendanceEngine(dbFile.absolutePath)
+        engine = AttendanceEngine(File(filesDir, "hozoor_attendance.db").absolutePath)
     }
 }

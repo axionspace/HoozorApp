@@ -2,7 +2,6 @@ package ir.hozoor.app
 
 import android.app.ActivityManager
 import android.content.Context
-import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import androidx.activity.ComponentActivity
@@ -24,22 +23,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val app = application as HozoorApplication
-
         setContent {
             val reduceMotion = remember {
                 val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
                 val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-                am.isLowRamDevice || pm.isPowerSaveMode || Build.VERSION.SDK_INT < Build.VERSION_CODES.P
+                am.isLowRamDevice || pm.isPowerSaveMode
             }
-
-            val vm: AttendanceViewModel = viewModel(
-                factory = object : ViewModelProvider.Factory {
-                    @Suppress("UNCHECKED_CAST")
-                    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                        return AttendanceViewModel(app.engine) as T
-                    }
-                }
-            )
+            val vm: AttendanceViewModel = viewModel(factory = object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T = AttendanceViewModel(app.engine) as T
+            })
             val uiState by vm.uiState.collectAsStateWithLifecycle()
             val systemDark = isSystemInDarkTheme()
             val useDark = when (uiState.themeMode) {
@@ -47,12 +40,7 @@ class MainActivity : ComponentActivity() {
                 "light" -> false
                 else -> systemDark
             }
-
-            HozoorExpressiveTheme(
-                darkTheme = useDark,
-                dynamicColor = uiState.dynamicColorEnabled,
-                reduceMotion = reduceMotion
-            ) {
+            HozoorExpressiveTheme(darkTheme = useDark, dynamicColor = uiState.dynamicColorEnabled, reduceMotion = reduceMotion) {
                 AttendanceScreen(viewModel = vm, isDarkTheme = useDark)
             }
         }
