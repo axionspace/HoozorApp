@@ -40,6 +40,7 @@ pub fn normalize_mobile(raw: &str) -> String {
     let d: String = normalize_persian(raw).chars().filter(|c| c.is_ascii_digit()).collect();
     if d.len() == 10 && d.starts_with('9') { format!("0{d}") }
     else if d.len() == 12 && d.starts_with("98") { format!("0{}", &d[2..]) }
+    else if d.len() == 14 && d.starts_with("0098") { format!("0{}", &d[4..]) }
     else { d }
 }
 

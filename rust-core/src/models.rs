@@ -107,12 +107,8 @@ pub struct ClassAnalytics {
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct StudentMonthlyEvent {
-    pub date_iso: String,
-    pub jalali_date: String,
-    pub period_label: String,
-    pub status: AttendanceStatus,
-    pub event_time: String,
-    pub note: String,
+    pub date_iso: String, pub jalali_date: String, pub period_label: String,
+    pub status: AttendanceStatus, pub event_time: String, pub note: String,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]

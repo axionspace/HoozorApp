@@ -11,6 +11,10 @@
         <package android:name="com.google.android.contacts" />
         <package android:name="com.android.contacts" />
         <package android:name="com.samsung.android.app.contacts" />
+        <package android:name="com.miui.contacts" />
+        <package android:name="com.huawei.contacts" />
+        <package android:name="com.hihonor.contacts" />
+        <package android:name="com.oplus.contacts" />
     </queries>
 
     <application

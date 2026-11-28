@@ -148,21 +148,13 @@ fun MonthlyReportContent(
             }
         }
 
-        // باکس جستجو در آمار و گزارش ماهانه
         item(key = "m_search") {
             OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchChange,
+                value = searchQuery, onValueChange = onSearchChange,
                 placeholder = { Text("جستجوی دانش‌آموز در گزارش ماهانه...") },
                 leadingIcon = { Icon(Icons.Rounded.Search, null) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchChange("") }) { Icon(Icons.Rounded.Close, "پاک کردن") }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(22.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                trailingIcon = { if (searchQuery.isNotEmpty()) IconButton(onClick = { onSearchChange("") }) { Icon(Icons.Rounded.Close, "پاک کردن") } },
+                singleLine = true, shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
             )
         }
 
@@ -179,24 +171,13 @@ fun MonthlyReportContent(
         }
     }
 
-    // باکس نمایش تاریخ دقیق غیبت‌ها، تأخیرها، غیبت‌های موجه و خروج‌های دانش‌آموز در ماه انتخاب‌شده
     if (inspectingStudent != null) {
-        StudentMonthlyDetailsDialog(
-            student = inspectingStudent,
-            monthLabel = report?.monthLabel.orEmpty(),
-            events = inspectingEvents,
-            onDismiss = onDismissInspect
-        )
+        StudentMonthlyDetailsDialog(inspectingStudent, report?.monthLabel.orEmpty(), inspectingEvents, onDismissInspect)
     }
 }
 
 @Composable
-private fun StudentMonthlyDetailsDialog(
-    student: MonthlyStudentStat,
-    monthLabel: String,
-    events: List<StudentMonthlyEvent>,
-    onDismiss: () -> Unit
-) {
+private fun StudentMonthlyDetailsDialog(student: MonthlyStudentStat, monthLabel: String, events: List<StudentMonthlyEvent>, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 8.dp) {
             Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -209,7 +190,6 @@ private fun StudentMonthlyDetailsDialog(
                     }
                 }
 
-                // خلاصه سریع
                 Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
                     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                         MonthlyKpi("غایب", toPersianDigits(student.absentPeriods.toString()), StatusColors.Absent)
@@ -237,19 +217,19 @@ private fun StudentMonthlyDetailsDialog(
                                         Text(ev.jalaliDate, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.ExtraBold)
                                         val detail = buildString {
                                             append(ev.periodLabel)
-                                            if (ev.eventTime.isNotBlank()) append(" • ساعت ${toPersianDigits(ev.eventTime)}")
+                                            if (ev.eventTime.isNotBlank()) {
+                                                if (ev.status == AttendanceStatus.LATE && !ev.eventTime.contains(":")) {
+                                                    append(" • ${toPersianDigits(ev.eventTime)} دقیقه")
+                                                } else {
+                                                    append(" • ساعت ${toPersianDigits(ev.eventTime)}")
+                                                }
+                                            }
                                             if (ev.note.isNotBlank()) append(" • ${ev.note}")
                                         }
                                         Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     Surface(shape = RoundedCornerShape(12.dp), color = stColor) {
-                                        Text(
-                                            text = statusLabelFa(ev.status),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = statusOnColor(ev.status),
-                                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
-                                        )
+                                        Text(statusLabelFa(ev.status), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = statusOnColor(ev.status), modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp))
                                     }
                                 }
                             }
@@ -304,7 +284,7 @@ private fun MonthlyStudentCard(index: Int, stat: MonthlyStudentStat, onClick: ()
                 Text("حاضر:${toPersianDigits(stat.presentPeriods.toString())}", style = MaterialTheme.typography.labelSmall, color = StatusColors.Present)
                 Text("غایب:${toPersianDigits(stat.absentPeriods.toString())}", style = MaterialTheme.typography.labelSmall, color = StatusColors.Absent)
                 Text("تأخیر:${toPersianDigits(stat.latePeriods.toString())}", style = MaterialTheme.typography.labelSmall, color = StatusColors.Late)
-                Text("موجه:${toPersianDigits(stat.excusedPeriods.toString())}", style = MaterialTheme.typography.labelSmall, color = StatusColors.Excused)
+                Text("غیبت موجه:${toPersianDigits(stat.excusedPeriods.toString())}", style = MaterialTheme.typography.labelSmall, color = StatusColors.Excused)
                 Text("خروج:${toPersianDigits(stat.leftClassPeriods.toString())}", style = MaterialTheme.typography.labelSmall, color = StatusColors.LeftClass)
             }
         }

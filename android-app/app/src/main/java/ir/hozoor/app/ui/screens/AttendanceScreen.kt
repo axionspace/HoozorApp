@@ -3,6 +3,7 @@ package ir.hozoor.app.ui.screens
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.provider.ContactsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -121,7 +122,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
         val uri = res.data?.data ?: return@rememberLauncherForActivityResult
         val picked = FileShareHelper.extractPhoneContact(context, uri)
         if (picked != null) viewModel.saveContact(picked.first, "مخاطب", picked.second)
-        else viewModel.setSheetFeedback("شماره‌ای برای این مخاطب ثبت نشده است")
+        else viewModel.setSheetFeedback("شماره معتبری برای این مخاطب پیدا نشد")
     }
 
     val saveBackupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -138,11 +139,20 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
     }
 
     fun buildStudentNotice(s: StudentAttendanceRow, st: AttendanceStatus): String {
-        val tPart = if (s.eventTime.isNotBlank()) " ساعت ${toPersianDigits(s.eventTime)}" else ""
         val nPart = if (s.note.isNotBlank()) " (${s.note})" else ""
         val statusText = when (st) {
-            AttendanceStatus.LATE -> "با تأخیر$tPart$nPart حاضر شده است"
-            AttendanceStatus.LEFT_CLASS -> "از کلاس خارج شده$tPart$nPart"
+            AttendanceStatus.LATE -> {
+                val tStr = when {
+                    s.eventTime.isBlank() -> "با تأخیر"
+                    s.eventTime.contains(":") -> "با تأخیر (ساعت ${toPersianDigits(s.eventTime)})"
+                    else -> "با ${toPersianDigits(s.eventTime)} دقیقه تأخیر"
+                }
+                "$tStr$nPart حاضر شده است"
+            }
+            AttendanceStatus.LEFT_CLASS -> {
+                val tStr = if (s.eventTime.isNotBlank()) " ساعت ${toPersianDigits(s.eventTime)}" else ""
+                "از کلاس خارج شده$tStr$nPart"
+            }
             AttendanceStatus.EXCUSED -> "دارای غیبت موجه بوده است"
             else -> "غایب بوده است"
         }
@@ -315,7 +325,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
         TimeWheelDialog(
             student = stu,
             targetStatus = targetStatus,
-            onConfirm = { time, reason -> viewModel.setStudentStatus(stu.studentId, targetStatus, time, reason) },
+            onConfirm = { value, reason -> viewModel.setStudentStatus(stu.studentId, targetStatus, value, reason) },
             onDismiss = { timedStatusTarget = null }
         )
     }
@@ -354,7 +364,13 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
             feedbackMessage = state.sheetFeedback,
             onToggleWholeSchool = { viewModel.prepareExportSheet(it) },
             onRecipientPhoneChange = viewModel::updatePrincipalPhone,
-            onPickPhoneContact = { contactPicker.launch(FileShareHelper.createPickPhoneContactIntent(context)) },
+            onPickPhoneContact = {
+                runCatching { contactPicker.launch(FileShareHelper.createPickPhoneContactIntent(context)) }
+                    .onFailure {
+                        runCatching { contactPicker.launch(Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI)) }
+                            .onFailure { viewModel.setSheetFeedback("اپلیکیشن مخاطبین پیدا نشد؛ شماره را دستی وارد کنید.") }
+                    }
+            },
             onSelectSavedContact = { c -> viewModel.updateRecipient(c.name, c.phone) },
             onSaveCurrentContact = { n, p -> viewModel.saveContact(n, "", p) },
             onDeleteSavedContact = viewModel::deleteContact,

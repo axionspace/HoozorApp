@@ -203,16 +203,12 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         val st = _uiState.value
         _uiState.update { it.copy(inspectingMonthlyStudent = stat, inspectingMonthlyEvents = emptyList()) }
         viewModelScope.launch {
-            val events = withContext(Dispatchers.IO) {
-                engine.getStudentMonthlyDetails(stat.studentId, st.monthlyYear, st.monthlyMonth)
-            }
+            val events = withContext(Dispatchers.IO) { engine.getStudentMonthlyDetails(stat.studentId, st.monthlyYear, st.monthlyMonth) }
             _uiState.update { it.copy(inspectingMonthlyEvents = events) }
         }
     }
 
-    fun closeStudentMonthlyDetails() {
-        _uiState.update { it.copy(inspectingMonthlyStudent = null, inspectingMonthlyEvents = emptyList()) }
-    }
+    fun closeStudentMonthlyDetails() { _uiState.update { it.copy(inspectingMonthlyStudent = null, inspectingMonthlyEvents = emptyList()) } }
 
     fun setStudentStatus(studentId: Long, status: AttendanceStatus, eventTime: String = "", note: String = "") {
         val st = _uiState.value

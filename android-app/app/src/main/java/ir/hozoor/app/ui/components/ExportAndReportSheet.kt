@@ -205,12 +205,13 @@ fun ExportAndReportSheet(
                         Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("${st.firstName} ${st.lastName}", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                                val subtitle = when {
+                                val sub = when {
                                     st.currentStatus == AttendanceStatus.LEFT_CLASS && st.eventTime.isNotBlank() -> "خروج ساعت ${toPersianDigits(st.eventTime)}"
-                                    st.currentStatus == AttendanceStatus.LATE && st.eventTime.isNotBlank() -> "تأخیر ساعت ${toPersianDigits(st.eventTime)}"
+                                    st.currentStatus == AttendanceStatus.LATE && st.eventTime.contains(":") -> "تأخیر ساعت ${toPersianDigits(st.eventTime)}"
+                                    st.currentStatus == AttendanceStatus.LATE && st.eventTime.isNotBlank() -> "تأخیر ${toPersianDigits(st.eventTime)} دقیقه"
                                     else -> statusLabelFa(st.currentStatus)
                                 }
-                                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = statusPrimaryColor(st.currentStatus))
+                                Text(sub, style = MaterialTheme.typography.labelSmall, color = statusPrimaryColor(st.currentStatus))
                             }
                             IconButton(onClick = { onNotifyParentSms(st) }) { Icon(Icons.Rounded.Sms, "پیامک ولی", tint = MaterialTheme.colorScheme.primary) }
                             IconButton(onClick = { onNotifyParentWhatsApp(st) }) { Icon(Icons.Rounded.Chat, "واتساپ ولی", tint = Color(0xFF16A34A)) }

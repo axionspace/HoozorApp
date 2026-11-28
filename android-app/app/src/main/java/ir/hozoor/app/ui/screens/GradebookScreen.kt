@@ -81,7 +81,6 @@ fun GradebookContent(
         item(key = "gb_cats") {
             ClassCategorySelector(majors, selectedMajor, grades, selectedGrade, sections, selectedSection, onSelectMajor, onSelectGrade, onSelectSection)
         }
-
         item(key = "gb_header") {
             Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -91,13 +90,11 @@ fun GradebookContent(
                             Icon(Icons.Rounded.Add, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(3.dp)); Text("عنوان جدید")
                         }
                     }
-
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         items(categories, key = { it.id }) { cat ->
                             FilterChip(selected = cat.id == selectedCategoryId, onClick = { onSelectCategory(cat.id) }, label = { Text(cat.name, fontWeight = if (cat.id == selectedCategoryId) FontWeight.ExtraBold else FontWeight.Medium) })
                         }
                     }
-
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         OutlinedButton(onClick = onExportGradebookExcel, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Rounded.TableChart, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("خروجی اکسل دفتر نمره")
@@ -109,25 +106,15 @@ fun GradebookContent(
                 }
             }
         }
-
-        // باکس جستجو در دفتر نمره
         item(key = "gb_search") {
             OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchChange,
+                value = searchQuery, onValueChange = onSearchChange,
                 placeholder = { Text("جستجوی دانش‌آموز در دفتر نمره...") },
                 leadingIcon = { Icon(Icons.Rounded.Search, null) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchChange("") }) { Icon(Icons.Rounded.Close, "پاک کردن") }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(22.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                trailingIcon = { if (searchQuery.isNotEmpty()) IconButton(onClick = { onSearchChange("") }) { Icon(Icons.Rounded.Close, "پاک کردن") } },
+                singleLine = true, shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
             )
         }
-
         itemsIndexed(filtered, key = { _, r -> r.studentId }) { idx, row ->
             Surface(onClick = { editingRow = row }, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 Row(modifier = Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -148,7 +148,6 @@ pub fn get_class_attendance(conn: &Connection, major: &str, grade: &str, section
     Ok(ClassAttendanceSnapshot { jalali_date: format_iso_to_jalali(date_iso), is_period_saved: saved, summary: sum, students })
 }
 
-/// ذخیره ساعت هم برای «تأخیر» و هم برای «خروج از کلاس»
 pub fn set_attendance(conn: &mut Connection, student_id: i64, date_iso: &str, period: Period, status: AttendanceStatus, event_time: &str, note: &str, teacher: &str, lesson: &str, class_time: &str) -> Result<(), CoreError> {
     let tx = conn.transaction().map_err(|e| CoreError::Database(e.to_string()))?;
     let now = now_unix();
@@ -239,7 +238,9 @@ pub fn delete_class(conn: &Connection, major: &str, grade: &str, section: i32) -
 pub fn get_grade_categories(conn: &Connection) -> Result<Vec<GradeCategory>, CoreError> {
     let mut st = conn.prepare_cached("SELECT id, name FROM grade_categories ORDER BY sort_order ASC, id ASC").map_err(|e| CoreError::Database(e.to_string()))?;
     let rows = st.query_map([], |r| Ok(GradeCategory { id: r.get(0)?, name: r.get(1)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+        .map_err(|e| CoreError::Database(e.to_string()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| CoreError::Database(e.to_string()))?;
     Ok(rows)
 }
 
@@ -282,7 +283,9 @@ pub fn set_student_grade(conn: &Connection, student_id: i64, category_id: i64, s
 pub fn get_saved_contacts(conn: &Connection) -> Result<Vec<SavedContact>, CoreError> {
     let mut st = conn.prepare_cached("SELECT id, name, role, phone FROM saved_contacts ORDER BY id ASC").map_err(|e| CoreError::Database(e.to_string()))?;
     let rows = st.query_map([], |r| Ok(SavedContact { id: r.get(0)?, name: r.get(1)?, role: r.get(2)?, phone: r.get(3)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+        .map_err(|e| CoreError::Database(e.to_string()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| CoreError::Database(e.to_string()))?;
     Ok(rows)
 }
 
@@ -313,16 +316,18 @@ pub fn get_backup_stats(conn: &Connection) -> Result<BackupStats, CoreError> {
 pub fn get_class_analytics(conn: &Connection, major: &str, grade: &str, section: i32) -> Result<ClassAnalytics, CoreError> {
     let mut names = HashMap::new();
     let mut ss = conn.prepare_cached("SELECT id, first_name, last_name FROM students WHERE major=?1 AND grade=?2 AND section=?3").map_err(|e| CoreError::Database(e.to_string()))?;
-    for r in ss.query_map(params![major, grade, section], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))).map_err(|e| CoreError::Database(e.to_string()))? {
-        let (id, f, l) = r.map_err(|e| CoreError::Database(e.to_string()))?;
-        names.insert(id, format!("{f} {l}"));
-    }
+    let s_rows = ss.query_map(params![major, grade, section], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?)))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    for (id, f, l) in s_rows { names.insert(id, format!("{f} {l}")); }
+
     let mut ast = conn.prepare_cached("SELECT a.student_id, a.date_iso, a.period, a.status FROM attendance a INNER JOIN students s ON s.id=a.student_id WHERE s.major=?1 AND s.grade=?2 AND s.section=?3 AND a.status!=0").map_err(|e| CoreError::Database(e.to_string()))?;
+    let a_rows = ast.query_map(params![major, grade, section], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, i32>(2)?, AttendanceStatus::from_i32(r.get::<_, i32>(3)?))))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+
     let mut sessions = HashSet::new();
     let (mut ta, mut tl, mut te, mut tlc) = (0, 0, 0, 0);
     let (mut ma, mut ml, mut me, mut mlc): (HashMap<i64, i32>, HashMap<i64, i32>, HashMap<i64, i32>, HashMap<i64, i32>) = Default::default();
-    for r in ast.query_map(params![major, grade, section], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, i32>(2)?, AttendanceStatus::from_i32(r.get::<_, i32>(3)?)))).map_err(|e| CoreError::Database(e.to_string()))? {
-        let (sid, d, p, st) = r.map_err(|e| CoreError::Database(e.to_string()))?;
+    for (sid, d, p, st) in a_rows {
         sessions.insert((d, p));
         match st {
             AttendanceStatus::Absent => { ta += 1; *ma.entry(sid).or_default() += 1; }
@@ -340,7 +345,6 @@ pub fn get_class_analytics(conn: &Connection, major: &str, grade: &str, section:
     Ok(ClassAnalytics { student_count: names.len() as i32, recorded_sessions: sessions.len() as i32, total_absent: ta, total_late: tl, total_excused: te, total_left_class: tlc, top_absent: rank(ma), top_late: rank(ml), top_excused: rank(me), top_left_class: rank(mlc) })
 }
 
-/// جزئیات تاریخ‌به‌تاریخ غیبت‌ها، تأخیرها، غیبت‌های موجه و خروج‌های یک دانش‌آموز در یک ماه شمسی
 pub fn get_student_monthly_details(conn: &Connection, student_id: i64, jy: i32, jm_i: i32) -> Result<Vec<StudentMonthlyEvent>, CoreError> {
     let jm = jm_i.clamp(1, 12) as u32;
     let (s_iso, e_iso) = jalali_month_range_iso(jy, jm);
@@ -357,13 +361,12 @@ pub fn get_student_monthly_details(conn: &Connection, student_id: i64, jy: i32, 
         let status = AttendanceStatus::from_i32(r.get(2)?);
         Ok(StudentMonthlyEvent {
             jalali_date: format_iso_to_jalali(&date_iso),
-            date_iso,
-            period_label: period.label_fa().to_string(),
-            status,
-            event_time: r.get(3)?,
-            note: r.get(4)?,
+            date_iso, period_label: period.label_fa().to_string(),
+            status, event_time: r.get(3)?, note: r.get(4)?,
         })
-    }).map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    }).map_err(|e| CoreError::Database(e.to_string()))?
+      .collect::<Result<Vec<_>, _>>()
+      .map_err(|e| CoreError::Database(e.to_string()))?;
     Ok(rows)
 }
 
@@ -376,9 +379,11 @@ pub fn get_monthly_report(conn: &Connection, major: &str, grade: &str, section: 
     base.sort_by(|a, b| persian_sort_key(&a.2).cmp(&persian_sort_key(&b.2)).then_with(|| persian_sort_key(&a.1).cmp(&persian_sort_key(&b.1))));
 
     let mut ast = conn.prepare_cached("SELECT a.student_id, a.date_iso, a.period, a.status FROM attendance a INNER JOIN students s ON s.id=a.student_id WHERE s.major=?1 AND s.grade=?2 AND s.section=?3 AND a.date_iso>=?4 AND a.date_iso<=?5 AND a.status!=0").map_err(|e| CoreError::Database(e.to_string()))?;
+    let a_rows = ast.query_map(params![major, grade, section, s_iso, e_iso], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, i32>(2)?, AttendanceStatus::from_i32(r.get::<_, i32>(3)?))))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+
     let (mut active_d, mut stu_d): (HashMap<String, HashSet<i32>>, HashMap<(i64, String), HashMap<i32, AttendanceStatus>>) = Default::default();
-    for r in ast.query_map(params![major, grade, section, s_iso, e_iso], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, i32>(2)?, AttendanceStatus::from_i32(r.get::<_, i32>(3)?)))).map_err(|e| CoreError::Database(e.to_string()))? {
-        let (sid, d, p, st) = r.map_err(|e| CoreError::Database(e.to_string()))?;
+    for (sid, d, p, st) in a_rows {
         active_d.entry(d.clone()).or_default().insert(p);
         stu_d.entry((sid, d)).or_default().insert(p, st);
     }
@@ -432,30 +437,32 @@ struct BkGrade { national_id: String, category_name: String, score: String, #[se
 struct BkContact { name: String, #[serde(default)] role: String, phone: String }
 
 pub fn export_backup_json(conn: &Connection) -> Result<String, CoreError> {
-    let students: Vec<BkStu> = conn.prepare("SELECT row_num,school_name,major,grade,section,first_name,last_name,father_name,national_id,mobile FROM students")
-        .map_err(|e| CoreError::Database(e.to_string()))?.query_map([], |r| Ok(BkStu { row_num: r.get(0)?, school_name: r.get(1)?, major: r.get(2)?, grade: r.get(3)?, section: r.get(4)?, first_name: r.get(5)?, last_name: r.get(6)?, father_name: r.get(7)?, national_id: r.get(8)?, mobile: r.get(9)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<_, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    let mut st1 = conn.prepare("SELECT row_num,school_name,major,grade,section,first_name,last_name,father_name,national_id,mobile FROM students").map_err(|e| CoreError::Database(e.to_string()))?;
+    let students: Vec<BkStu> = st1.query_map([], |r| Ok(BkStu { row_num: r.get(0)?, school_name: r.get(1)?, major: r.get(2)?, grade: r.get(3)?, section: r.get(4)?, first_name: r.get(5)?, last_name: r.get(6)?, father_name: r.get(7)?, national_id: r.get(8)?, mobile: r.get(9)? }))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
 
-    let attendance: Vec<BkAtt> = conn.prepare("SELECT s.national_id,a.date_iso,a.period,a.status,a.exit_time,a.note,a.teacher_name,a.lesson_name,a.class_time FROM attendance a INNER JOIN students s ON s.id=a.student_id")
-        .map_err(|e| CoreError::Database(e.to_string()))?.query_map([], |r| Ok(BkAtt { national_id: r.get(0)?, date_iso: r.get(1)?, period: r.get(2)?, status: r.get(3)?, exit_time: r.get(4)?, note: r.get(5)?, teacher_name: r.get(6)?, lesson_name: r.get(7)?, class_time: r.get(8)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<_, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    let mut st2 = conn.prepare("SELECT s.national_id,a.date_iso,a.period,a.status,a.exit_time,a.note,a.teacher_name,a.lesson_name,a.class_time FROM attendance a INNER JOIN students s ON s.id=a.student_id").map_err(|e| CoreError::Database(e.to_string()))?;
+    let attendance: Vec<BkAtt> = st2.query_map([], |r| Ok(BkAtt { national_id: r.get(0)?, date_iso: r.get(1)?, period: r.get(2)?, status: r.get(3)?, exit_time: r.get(4)?, note: r.get(5)?, teacher_name: r.get(6)?, lesson_name: r.get(7)?, class_time: r.get(8)? }))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
 
-    let grade_categories: Vec<String> = conn.prepare("SELECT name FROM grade_categories ORDER BY sort_order ASC, id ASC")
-        .map_err(|e| CoreError::Database(e.to_string()))?.query_map([], |r| r.get(0)).map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<_, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    let mut st3 = conn.prepare("SELECT name FROM grade_categories ORDER BY sort_order ASC, id ASC").map_err(|e| CoreError::Database(e.to_string()))?;
+    let grade_categories: Vec<String> = st3.query_map([], |r| r.get(0))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
 
-    let grades: Vec<BkGrade> = conn.prepare("SELECT s.national_id,c.name,g.score,g.note FROM student_grades g INNER JOIN students s ON s.id=g.student_id INNER JOIN grade_categories c ON c.id=g.category_id WHERE g.score!='' OR g.note!=''")
-        .map_err(|e| CoreError::Database(e.to_string()))?.query_map([], |r| Ok(BkGrade { national_id: r.get(0)?, category_name: r.get(1)?, score: r.get(2)?, note: r.get(3)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<_, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    let mut st4 = conn.prepare("SELECT s.national_id,c.name,g.score,g.note FROM student_grades g INNER JOIN students s ON s.id=g.student_id INNER JOIN grade_categories c ON c.id=g.category_id WHERE g.score!='' OR g.note!=''").map_err(|e| CoreError::Database(e.to_string()))?;
+    let grades: Vec<BkGrade> = st4.query_map([], |r| Ok(BkGrade { national_id: r.get(0)?, category_name: r.get(1)?, score: r.get(2)?, note: r.get(3)? }))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
 
-    let contacts: Vec<BkContact> = conn.prepare("SELECT name,role,phone FROM saved_contacts")
-        .map_err(|e| CoreError::Database(e.to_string()))?.query_map([], |r| Ok(BkContact { name: r.get(0)?, role: r.get(1)?, phone: r.get(2)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<_, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    let mut st5 = conn.prepare("SELECT name,role,phone FROM saved_contacts").map_err(|e| CoreError::Database(e.to_string()))?;
+    let contacts: Vec<BkContact> = st5.query_map([], |r| Ok(BkContact { name: r.get(0)?, role: r.get(1)?, phone: r.get(2)? }))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
 
+    let mut st6 = conn.prepare("SELECT key,value FROM app_settings").map_err(|e| CoreError::Database(e.to_string()))?;
+    let set_rows = st6.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
     let mut settings = HashMap::new();
-    for r in conn.prepare("SELECT key,value FROM app_settings").map_err(|e| CoreError::Database(e.to_string()))?.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))).map_err(|e| CoreError::Database(e.to_string()))? {
-        let (k, v) = r.map_err(|e| CoreError::Database(e.to_string()))?;
-        settings.insert(k, v);
-    }
+    for (k, v) in set_rows { settings.insert(k, v); }
+
     serde_json::to_string_pretty(&BkPayload { version: 5, students, attendance, grade_categories, grades, contacts, settings }).map_err(|e| CoreError::Import(e.to_string()))
 }
 
@@ -484,9 +491,9 @@ pub fn restore_backup_json(conn: &mut Connection, json_text: &str) -> Result<Imp
     let mut cat_map = HashMap::new();
     {
         let mut cst = tx.prepare("SELECT id, name FROM grade_categories").map_err(|e| CoreError::Database(e.to_string()))?;
-        for r in cst.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))).map_err(|e| CoreError::Database(e.to_string()))? {
-            if let Ok((id, n)) = r { cat_map.insert(n, id); }
-        }
+        let c_rows = cst.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))
+            .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+        for (id, n) in c_rows { cat_map.insert(n, id); }
     }
     for g in &p.grades {
         if let (Some(&sid), Some(&cid)) = (stu_map.get(&g.national_id), cat_map.get(&g.category_name)) {

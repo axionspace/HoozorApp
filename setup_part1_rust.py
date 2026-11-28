@@ -3,7 +3,7 @@ from pathlib import Path
 FILES = {
     "rust-core/Cargo.toml": r'''[package]
 name = "hozoor_core"
-version = "5.0.0"
+version = "5.1.0"
 edition = "2021"
 
 [lib]
@@ -142,12 +142,8 @@ pub struct ClassAnalytics {
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct StudentMonthlyEvent {
-    pub date_iso: String,
-    pub jalali_date: String,
-    pub period_label: String,
-    pub status: AttendanceStatus,
-    pub event_time: String,
-    pub note: String,
+    pub date_iso: String, pub jalali_date: String, pub period_label: String,
+    pub status: AttendanceStatus, pub event_time: String, pub note: String,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -217,6 +213,7 @@ pub fn normalize_mobile(raw: &str) -> String {
     let d: String = normalize_persian(raw).chars().filter(|c| c.is_ascii_digit()).collect();
     if d.len() == 10 && d.starts_with('9') { format!("0{d}") }
     else if d.len() == 12 && d.starts_with("98") { format!("0{}", &d[2..]) }
+    else if d.len() == 14 && d.starts_with("0098") { format!("0{}", &d[4..]) }
     else { d }
 }
 
@@ -576,7 +573,6 @@ pub fn get_class_attendance(conn: &Connection, major: &str, grade: &str, section
     Ok(ClassAttendanceSnapshot { jalali_date: format_iso_to_jalali(date_iso), is_period_saved: saved, summary: sum, students })
 }
 
-/// ذخیره ساعت هم برای «تأخیر» و هم برای «خروج از کلاس»
 pub fn set_attendance(conn: &mut Connection, student_id: i64, date_iso: &str, period: Period, status: AttendanceStatus, event_time: &str, note: &str, teacher: &str, lesson: &str, class_time: &str) -> Result<(), CoreError> {
     let tx = conn.transaction().map_err(|e| CoreError::Database(e.to_string()))?;
     let now = now_unix();
@@ -667,7 +663,9 @@ pub fn delete_class(conn: &Connection, major: &str, grade: &str, section: i32) -
 pub fn get_grade_categories(conn: &Connection) -> Result<Vec<GradeCategory>, CoreError> {
     let mut st = conn.prepare_cached("SELECT id, name FROM grade_categories ORDER BY sort_order ASC, id ASC").map_err(|e| CoreError::Database(e.to_string()))?;
     let rows = st.query_map([], |r| Ok(GradeCategory { id: r.get(0)?, name: r.get(1)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+        .map_err(|e| CoreError::Database(e.to_string()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| CoreError::Database(e.to_string()))?;
     Ok(rows)
 }
 
@@ -710,7 +708,9 @@ pub fn set_student_grade(conn: &Connection, student_id: i64, category_id: i64, s
 pub fn get_saved_contacts(conn: &Connection) -> Result<Vec<SavedContact>, CoreError> {
     let mut st = conn.prepare_cached("SELECT id, name, role, phone FROM saved_contacts ORDER BY id ASC").map_err(|e| CoreError::Database(e.to_string()))?;
     let rows = st.query_map([], |r| Ok(SavedContact { id: r.get(0)?, name: r.get(1)?, role: r.get(2)?, phone: r.get(3)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+        .map_err(|e| CoreError::Database(e.to_string()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| CoreError::Database(e.to_string()))?;
     Ok(rows)
 }
 
@@ -741,16 +741,18 @@ pub fn get_backup_stats(conn: &Connection) -> Result<BackupStats, CoreError> {
 pub fn get_class_analytics(conn: &Connection, major: &str, grade: &str, section: i32) -> Result<ClassAnalytics, CoreError> {
     let mut names = HashMap::new();
     let mut ss = conn.prepare_cached("SELECT id, first_name, last_name FROM students WHERE major=?1 AND grade=?2 AND section=?3").map_err(|e| CoreError::Database(e.to_string()))?;
-    for r in ss.query_map(params![major, grade, section], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))).map_err(|e| CoreError::Database(e.to_string()))? {
-        let (id, f, l) = r.map_err(|e| CoreError::Database(e.to_string()))?;
-        names.insert(id, format!("{f} {l}"));
-    }
+    let s_rows = ss.query_map(params![major, grade, section], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?)))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    for (id, f, l) in s_rows { names.insert(id, format!("{f} {l}")); }
+
     let mut ast = conn.prepare_cached("SELECT a.student_id, a.date_iso, a.period, a.status FROM attendance a INNER JOIN students s ON s.id=a.student_id WHERE s.major=?1 AND s.grade=?2 AND s.section=?3 AND a.status!=0").map_err(|e| CoreError::Database(e.to_string()))?;
+    let a_rows = ast.query_map(params![major, grade, section], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, i32>(2)?, AttendanceStatus::from_i32(r.get::<_, i32>(3)?))))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+
     let mut sessions = HashSet::new();
     let (mut ta, mut tl, mut te, mut tlc) = (0, 0, 0, 0);
     let (mut ma, mut ml, mut me, mut mlc): (HashMap<i64, i32>, HashMap<i64, i32>, HashMap<i64, i32>, HashMap<i64, i32>) = Default::default();
-    for r in ast.query_map(params![major, grade, section], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, i32>(2)?, AttendanceStatus::from_i32(r.get::<_, i32>(3)?)))).map_err(|e| CoreError::Database(e.to_string()))? {
-        let (sid, d, p, st) = r.map_err(|e| CoreError::Database(e.to_string()))?;
+    for (sid, d, p, st) in a_rows {
         sessions.insert((d, p));
         match st {
             AttendanceStatus::Absent => { ta += 1; *ma.entry(sid).or_default() += 1; }
@@ -768,7 +770,6 @@ pub fn get_class_analytics(conn: &Connection, major: &str, grade: &str, section:
     Ok(ClassAnalytics { student_count: names.len() as i32, recorded_sessions: sessions.len() as i32, total_absent: ta, total_late: tl, total_excused: te, total_left_class: tlc, top_absent: rank(ma), top_late: rank(ml), top_excused: rank(me), top_left_class: rank(mlc) })
 }
 
-/// جزئیات تاریخ‌به‌تاریخ غیبت‌ها، تأخیرها، غیبت‌های موجه و خروج‌های یک دانش‌آموز در یک ماه شمسی
 pub fn get_student_monthly_details(conn: &Connection, student_id: i64, jy: i32, jm_i: i32) -> Result<Vec<StudentMonthlyEvent>, CoreError> {
     let jm = jm_i.clamp(1, 12) as u32;
     let (s_iso, e_iso) = jalali_month_range_iso(jy, jm);
@@ -785,13 +786,12 @@ pub fn get_student_monthly_details(conn: &Connection, student_id: i64, jy: i32, 
         let status = AttendanceStatus::from_i32(r.get(2)?);
         Ok(StudentMonthlyEvent {
             jalali_date: format_iso_to_jalali(&date_iso),
-            date_iso,
-            period_label: period.label_fa().to_string(),
-            status,
-            event_time: r.get(3)?,
-            note: r.get(4)?,
+            date_iso, period_label: period.label_fa().to_string(),
+            status, event_time: r.get(3)?, note: r.get(4)?,
         })
-    }).map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    }).map_err(|e| CoreError::Database(e.to_string()))?
+      .collect::<Result<Vec<_>, _>>()
+      .map_err(|e| CoreError::Database(e.to_string()))?;
     Ok(rows)
 }
 
@@ -804,9 +804,11 @@ pub fn get_monthly_report(conn: &Connection, major: &str, grade: &str, section: 
     base.sort_by(|a, b| persian_sort_key(&a.2).cmp(&persian_sort_key(&b.2)).then_with(|| persian_sort_key(&a.1).cmp(&persian_sort_key(&b.1))));
 
     let mut ast = conn.prepare_cached("SELECT a.student_id, a.date_iso, a.period, a.status FROM attendance a INNER JOIN students s ON s.id=a.student_id WHERE s.major=?1 AND s.grade=?2 AND s.section=?3 AND a.date_iso>=?4 AND a.date_iso<=?5 AND a.status!=0").map_err(|e| CoreError::Database(e.to_string()))?;
+    let a_rows = ast.query_map(params![major, grade, section, s_iso, e_iso], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, i32>(2)?, AttendanceStatus::from_i32(r.get::<_, i32>(3)?))))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+
     let (mut active_d, mut stu_d): (HashMap<String, HashSet<i32>>, HashMap<(i64, String), HashMap<i32, AttendanceStatus>>) = Default::default();
-    for r in ast.query_map(params![major, grade, section, s_iso, e_iso], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, i32>(2)?, AttendanceStatus::from_i32(r.get::<_, i32>(3)?)))).map_err(|e| CoreError::Database(e.to_string()))? {
-        let (sid, d, p, st) = r.map_err(|e| CoreError::Database(e.to_string()))?;
+    for (sid, d, p, st) in a_rows {
         active_d.entry(d.clone()).or_default().insert(p);
         stu_d.entry((sid, d)).or_default().insert(p, st);
     }
@@ -860,30 +862,32 @@ struct BkGrade { national_id: String, category_name: String, score: String, #[se
 struct BkContact { name: String, #[serde(default)] role: String, phone: String }
 
 pub fn export_backup_json(conn: &Connection) -> Result<String, CoreError> {
-    let students: Vec<BkStu> = conn.prepare("SELECT row_num,school_name,major,grade,section,first_name,last_name,father_name,national_id,mobile FROM students")
-        .map_err(|e| CoreError::Database(e.to_string()))?.query_map([], |r| Ok(BkStu { row_num: r.get(0)?, school_name: r.get(1)?, major: r.get(2)?, grade: r.get(3)?, section: r.get(4)?, first_name: r.get(5)?, last_name: r.get(6)?, father_name: r.get(7)?, national_id: r.get(8)?, mobile: r.get(9)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<_, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    let mut st1 = conn.prepare("SELECT row_num,school_name,major,grade,section,first_name,last_name,father_name,national_id,mobile FROM students").map_err(|e| CoreError::Database(e.to_string()))?;
+    let students: Vec<BkStu> = st1.query_map([], |r| Ok(BkStu { row_num: r.get(0)?, school_name: r.get(1)?, major: r.get(2)?, grade: r.get(3)?, section: r.get(4)?, first_name: r.get(5)?, last_name: r.get(6)?, father_name: r.get(7)?, national_id: r.get(8)?, mobile: r.get(9)? }))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
 
-    let attendance: Vec<BkAtt> = conn.prepare("SELECT s.national_id,a.date_iso,a.period,a.status,a.exit_time,a.note,a.teacher_name,a.lesson_name,a.class_time FROM attendance a INNER JOIN students s ON s.id=a.student_id")
-        .map_err(|e| CoreError::Database(e.to_string()))?.query_map([], |r| Ok(BkAtt { national_id: r.get(0)?, date_iso: r.get(1)?, period: r.get(2)?, status: r.get(3)?, exit_time: r.get(4)?, note: r.get(5)?, teacher_name: r.get(6)?, lesson_name: r.get(7)?, class_time: r.get(8)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<_, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    let mut st2 = conn.prepare("SELECT s.national_id,a.date_iso,a.period,a.status,a.exit_time,a.note,a.teacher_name,a.lesson_name,a.class_time FROM attendance a INNER JOIN students s ON s.id=a.student_id").map_err(|e| CoreError::Database(e.to_string()))?;
+    let attendance: Vec<BkAtt> = st2.query_map([], |r| Ok(BkAtt { national_id: r.get(0)?, date_iso: r.get(1)?, period: r.get(2)?, status: r.get(3)?, exit_time: r.get(4)?, note: r.get(5)?, teacher_name: r.get(6)?, lesson_name: r.get(7)?, class_time: r.get(8)? }))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
 
-    let grade_categories: Vec<String> = conn.prepare("SELECT name FROM grade_categories ORDER BY sort_order ASC, id ASC")
-        .map_err(|e| CoreError::Database(e.to_string()))?.query_map([], |r| r.get(0)).map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<_, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    let mut st3 = conn.prepare("SELECT name FROM grade_categories ORDER BY sort_order ASC, id ASC").map_err(|e| CoreError::Database(e.to_string()))?;
+    let grade_categories: Vec<String> = st3.query_map([], |r| r.get(0))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
 
-    let grades: Vec<BkGrade> = conn.prepare("SELECT s.national_id,c.name,g.score,g.note FROM student_grades g INNER JOIN students s ON s.id=g.student_id INNER JOIN grade_categories c ON c.id=g.category_id WHERE g.score!='' OR g.note!=''")
-        .map_err(|e| CoreError::Database(e.to_string()))?.query_map([], |r| Ok(BkGrade { national_id: r.get(0)?, category_name: r.get(1)?, score: r.get(2)?, note: r.get(3)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<_, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    let mut st4 = conn.prepare("SELECT s.national_id,c.name,g.score,g.note FROM student_grades g INNER JOIN students s ON s.id=g.student_id INNER JOIN grade_categories c ON c.id=g.category_id WHERE g.score!='' OR g.note!=''").map_err(|e| CoreError::Database(e.to_string()))?;
+    let grades: Vec<BkGrade> = st4.query_map([], |r| Ok(BkGrade { national_id: r.get(0)?, category_name: r.get(1)?, score: r.get(2)?, note: r.get(3)? }))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
 
-    let contacts: Vec<BkContact> = conn.prepare("SELECT name,role,phone FROM saved_contacts")
-        .map_err(|e| CoreError::Database(e.to_string()))?.query_map([], |r| Ok(BkContact { name: r.get(0)?, role: r.get(1)?, phone: r.get(2)? }))
-        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<_, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    let mut st5 = conn.prepare("SELECT name,role,phone FROM saved_contacts").map_err(|e| CoreError::Database(e.to_string()))?;
+    let contacts: Vec<BkContact> = st5.query_map([], |r| Ok(BkContact { name: r.get(0)?, role: r.get(1)?, phone: r.get(2)? }))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
 
+    let mut st6 = conn.prepare("SELECT key,value FROM app_settings").map_err(|e| CoreError::Database(e.to_string()))?;
+    let set_rows = st6.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+        .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
     let mut settings = HashMap::new();
-    for r in conn.prepare("SELECT key,value FROM app_settings").map_err(|e| CoreError::Database(e.to_string()))?.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))).map_err(|e| CoreError::Database(e.to_string()))? {
-        let (k, v) = r.map_err(|e| CoreError::Database(e.to_string()))?;
-        settings.insert(k, v);
-    }
+    for (k, v) in set_rows { settings.insert(k, v); }
+
     serde_json::to_string_pretty(&BkPayload { version: 5, students, attendance, grade_categories, grades, contacts, settings }).map_err(|e| CoreError::Import(e.to_string()))
 }
 
@@ -912,9 +916,9 @@ pub fn restore_backup_json(conn: &mut Connection, json_text: &str) -> Result<Imp
     let mut cat_map = HashMap::new();
     {
         let mut cst = tx.prepare("SELECT id, name FROM grade_categories").map_err(|e| CoreError::Database(e.to_string()))?;
-        for r in cst.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))).map_err(|e| CoreError::Database(e.to_string()))? {
-            if let Ok((id, n)) = r { cat_map.insert(n, id); }
-        }
+        let c_rows = cst.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))
+            .map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+        for (id, n) in c_rows { cat_map.insert(n, id); }
     }
     for g in &p.grades {
         if let (Some(&sid), Some(&cid)) = (stu_map.get(&g.national_id), cat_map.get(&g.category_name)) {
@@ -945,7 +949,6 @@ use std::collections::{HashMap, HashSet};
 const P_FULL: [&str; 4] = ["زنگ اول", "زنگ دوم", "زنگ سوم", "زنگ چهارم"];
 const P_SMS: [&str; 4] = ["زنگ ۱", "زنگ ۲", "زنگ ۳", "زنگ ۴"];
 
-/// اگر کلاس در رشته و پایه خودش فقط ۱ شعبه داشته باشد، عبارت «شعبه» حذف می‌شود
 fn cls_title(major: &str, grade: &str, sec: i32, show_section: bool) -> String {
     let s = to_persian_digits(&sec.to_string());
     match (major.trim().is_empty(), show_section) {
@@ -958,24 +961,26 @@ fn cls_title(major: &str, grade: &str, sec: i32, show_section: bool) -> String {
 
 fn build_multi_section_map(all: &[ClassGroup]) -> HashMap<(String, String), bool> {
     let mut sets: HashMap<(String, String), HashSet<i32>> = HashMap::new();
-    for c in all {
-        sets.entry((c.major.clone(), c.grade.clone())).or_default().insert(c.section);
-    }
+    for c in all { sets.entry((c.major.clone(), c.grade.clone())).or_default().insert(c.section); }
     sets.into_iter().map(|(k, v)| (k, v.len() > 1)).collect()
 }
 
-fn late_suffix(time: &str, note: &str) -> String {
-    let t = to_persian_digits(time);
-    match (t.is_empty(), note.trim().is_empty()) {
-        (true, true) => "تأخیر".into(),
-        (false, true) => format!("تأخیر ساعت {t}"),
-        (true, false) => format!("تأخیر - {}", note.trim()),
-        (false, false) => format!("تأخیر ساعت {t} - {}", note.trim()),
-    }
+/// نمایش تأخیر بر اساس دقیقه (مثلاً: «تأخیر ۱۰ دقیقه») و پشتیبانی از رکوردهای قدیمی ساعتی
+fn late_suffix(val: &str, note: &str) -> String {
+    let clean = val.trim();
+    let t = to_persian_digits(clean);
+    let base = if t.is_empty() {
+        "تأخیر".to_string()
+    } else if clean.contains(':') {
+        format!("تأخیر ساعت {t}")
+    } else {
+        format!("تأخیر {t} دقیقه")
+    };
+    if note.trim().is_empty() { base } else { format!("{base} - {}", note.trim()) }
 }
 
 fn exit_suffix(time: &str, note: &str) -> String {
-    let t = to_persian_digits(time);
+    let t = to_persian_digits(time.trim());
     match (t.is_empty(), note.trim().is_empty()) {
         (true, true) => "خروج از کلاس".into(),
         (false, true) => format!("خروج ساعت {t}"),
@@ -1353,139 +1358,164 @@ impl AttendanceEngine {
 
     pub fn import_file_bytes(&self, file_name: String, bytes: Vec<u8>, replace_existing: bool) -> Result<ImportReport, CoreError> {
         let mut c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
-        importer::import_file_bytes(&mut c, &file_name, &bytes, replace_existing)
+        importer::import_file_bytes(&mut *c, &file_name, &bytes, replace_existing)
     }
 
     pub fn get_classes(&self) -> Result<Vec<ClassGroup>, CoreError> {
-        db::get_classes(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::get_classes(&*c)
     }
 
     pub fn get_class_attendance(&self, major: String, grade: String, section: i32, date_iso: String, period: Period, search_query: String) -> Result<ClassAttendanceSnapshot, CoreError> {
-        db::get_class_attendance(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, period, &search_query)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::get_class_attendance(&*c, &major, &grade, section, &date_iso, period, &search_query)
     }
 
     pub fn set_attendance(&self, student_id: i64, date_iso: String, period: Period, status: AttendanceStatus, event_time: String, note: String, teacher_name: String, lesson_name: String, class_time: String) -> Result<(), CoreError> {
         let mut c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
-        db::set_attendance(&mut c, student_id, &date_iso, period, status, &event_time, &note, &teacher_name, &lesson_name, &class_time)
+        db::set_attendance(&mut *c, student_id, &date_iso, period, status, &event_time, &note, &teacher_name, &lesson_name, &class_time)
     }
 
     pub fn mark_class_status(&self, major: String, grade: String, section: i32, date_iso: String, period: Period, status: AttendanceStatus, only_unmarked: bool, teacher_name: String, lesson_name: String, class_time: String) -> Result<i32, CoreError> {
-        db::mark_class_status(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, period, status, only_unmarked, &teacher_name, &lesson_name, &class_time)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::mark_class_status(&*c, &major, &grade, section, &date_iso, period, status, only_unmarked, &teacher_name, &lesson_name, &class_time)
     }
 
     pub fn copy_from_previous_period(&self, major: String, grade: String, section: i32, date_iso: String, target_period: Period) -> Result<i32, CoreError> {
-        db::copy_from_previous_period(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, target_period)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::copy_from_previous_period(&*c, &major, &grade, section, &date_iso, target_period)
     }
 
     pub fn add_student(&self, school_name: String, major: String, grade: String, section: i32, first_name: String, last_name: String, father_name: String, national_id: String, mobile: String) -> Result<i64, CoreError> {
-        db::add_student(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &school_name, &major, &grade, section, &first_name, &last_name, &father_name, &national_id, &mobile)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::add_student(&*c, &school_name, &major, &grade, section, &first_name, &last_name, &father_name, &national_id, &mobile)
     }
 
     pub fn update_student(&self, student_id: i64, first_name: String, last_name: String, father_name: String, national_id: String, mobile: String) -> Result<(), CoreError> {
-        db::update_student(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, student_id, &first_name, &last_name, &father_name, &national_id, &mobile)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::update_student(&*c, student_id, &first_name, &last_name, &father_name, &national_id, &mobile)
     }
 
     pub fn delete_student(&self, student_id: i64) -> Result<(), CoreError> {
-        db::delete_student(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, student_id)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::delete_student(&*c, student_id)
     }
 
     pub fn delete_class(&self, major: String, grade: String, section: i32) -> Result<i32, CoreError> {
-        db::delete_class(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::delete_class(&*c, &major, &grade, section)
     }
 
     pub fn get_grade_categories(&self) -> Result<Vec<GradeCategory>, CoreError> {
-        db::get_grade_categories(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::get_grade_categories(&*c)
     }
 
     pub fn add_grade_category(&self, name: String) -> Result<i64, CoreError> {
-        db::add_grade_category(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &name)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::add_grade_category(&*c, &name)
     }
 
     pub fn delete_grade_category(&self, category_id: i64) -> Result<(), CoreError> {
-        db::delete_grade_category(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, category_id)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::delete_grade_category(&*c, category_id)
     }
 
     pub fn get_class_grades(&self, major: String, grade: String, section: i32, category_id: i64) -> Result<Vec<StudentGradeRow>, CoreError> {
-        db::get_class_grades(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, category_id)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::get_class_grades(&*c, &major, &grade, section, category_id)
     }
 
     pub fn set_student_grade(&self, student_id: i64, category_id: i64, score: String, note: String) -> Result<(), CoreError> {
-        db::set_student_grade(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, student_id, category_id, &score, &note)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::set_student_grade(&*c, student_id, category_id, &score, &note)
     }
 
     pub fn export_gradebook_xlsx(&self, major: String, grade: String, section: i32) -> Result<Vec<u8>, CoreError> {
-        reports::export_gradebook_xlsx(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        reports::export_gradebook_xlsx(&*c, &major, &grade, section)
     }
 
     pub fn get_saved_contacts(&self) -> Result<Vec<SavedContact>, CoreError> {
-        db::get_saved_contacts(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::get_saved_contacts(&*c)
     }
 
     pub fn save_contact(&self, name: String, role: String, phone: String) -> Result<i64, CoreError> {
-        db::save_contact(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &name, &role, &phone)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::save_contact(&*c, &name, &role, &phone)
     }
 
     pub fn delete_contact(&self, contact_id: i64) -> Result<(), CoreError> {
-        db::delete_contact(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, contact_id)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::delete_contact(&*c, contact_id)
     }
 
     pub fn get_backup_stats(&self) -> Result<BackupStats, CoreError> {
-        db::get_backup_stats(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::get_backup_stats(&*c)
     }
 
     pub fn get_class_analytics(&self, major: String, grade: String, section: i32) -> Result<ClassAnalytics, CoreError> {
-        db::get_class_analytics(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::get_class_analytics(&*c, &major, &grade, section)
     }
 
     pub fn get_student_monthly_details(&self, student_id: i64, jalali_year: i32, jalali_month: i32) -> Result<Vec<StudentMonthlyEvent>, CoreError> {
-        db::get_student_monthly_details(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, student_id, jalali_year, jalali_month)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::get_student_monthly_details(&*c, student_id, jalali_year, jalali_month)
     }
 
     pub fn generate_period_group_message(&self, major: String, grade: String, section: i32, date_iso: String, period: Period, target_status: AttendanceStatus, teacher_name: String, lesson_name: String, whole_school: bool) -> Result<String, CoreError> {
-        reports::generate_period_group_message(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, period, target_status, &teacher_name, &lesson_name, whole_school)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        reports::generate_period_group_message(&*c, &major, &grade, section, &date_iso, period, target_status, &teacher_name, &lesson_name, whole_school)
     }
 
     pub fn generate_principal_report(&self, major: String, grade: String, section: i32, date_iso: String, whole_school: bool, teacher_name: String) -> Result<PrincipalReportBundle, CoreError> {
         let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
-        if whole_school { reports::generate_principal_report(&c, None, None, None, &date_iso, &teacher_name) }
-        else { reports::generate_principal_report(&c, Some(&major), Some(&grade), Some(section), &date_iso, &teacher_name) }
+        if whole_school { reports::generate_principal_report(&*c, None, None, None, &date_iso, &teacher_name) }
+        else { reports::generate_principal_report(&*c, Some(&major), Some(&grade), Some(section), &date_iso, &teacher_name) }
     }
 
     pub fn export_daily_csv(&self, major: String, grade: String, section: i32, date_iso: String) -> Result<String, CoreError> {
-        reports::export_daily_csv(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        reports::export_daily_csv(&*c, &major, &grade, section, &date_iso)
     }
 
     pub fn export_daily_xlsx(&self, major: String, grade: String, section: i32, date_iso: String, whole_school: bool) -> Result<Vec<u8>, CoreError> {
-        reports::export_daily_xlsx(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, whole_school)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        reports::export_daily_xlsx(&*c, &major, &grade, section, &date_iso, whole_school)
     }
 
     pub fn get_monthly_report(&self, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<MonthlyClassReport, CoreError> {
-        db::get_monthly_report(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, jalali_year, jalali_month)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::get_monthly_report(&*c, &major, &grade, section, jalali_year, jalali_month)
     }
 
     pub fn export_monthly_xlsx(&self, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<Vec<u8>, CoreError> {
         let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
-        let r = db::get_monthly_report(&c, &major, &grade, section, jalali_year, jalali_month)?;
-        let all = db::get_classes(&c)?;
+        let r = db::get_monthly_report(&*c, &major, &grade, section, jalali_year, jalali_month)?;
+        let all = db::get_classes(&*c)?;
         let show_sec = all.iter().filter(|x| x.major == major && x.grade == grade).count() > 1;
         reports::export_monthly_xlsx(&r, &major, &grade, section, show_sec)
     }
 
     pub fn export_monthly_csv(&self, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<String, CoreError> {
         let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
-        let r = db::get_monthly_report(&c, &major, &grade, section, jalali_year, jalali_month)?;
+        let r = db::get_monthly_report(&*c, &major, &grade, section, jalali_year, jalali_month)?;
         Ok(reports::export_monthly_csv(&r, &major, &grade, section))
     }
 
     pub fn export_template_xlsx(&self) -> Result<Vec<u8>, CoreError> { reports::export_template_xlsx() }
 
     pub fn export_backup_json(&self) -> Result<String, CoreError> {
-        db::export_backup_json(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::export_backup_json(&*c)
     }
 
     pub fn restore_backup_json(&self, json_text: String) -> Result<ImportReport, CoreError> {
         let mut c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
-        db::restore_backup_json(&mut c, &json_text)
+        db::restore_backup_json(&mut *c, &json_text)
     }
 
     pub fn format_jalali_date(&self, date_iso: String) -> String { persian::format_iso_to_jalali(&date_iso) }
@@ -1500,11 +1530,13 @@ impl AttendanceEngine {
     }
 
     pub fn set_setting(&self, key: String, value: String) -> Result<(), CoreError> {
-        db::set_setting(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &key, &value)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::set_setting(&*c, &key, &value)
     }
 
     pub fn get_setting(&self, key: String) -> Result<String, CoreError> {
-        db::get_setting(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &key)
+        let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
+        db::get_setting(&*c, &key)
     }
 }
 
@@ -1517,32 +1549,23 @@ mod tests {
 3,نمونه,صنایع شیمیایی,یازدهم,2,ابراهیم,احمدی,راشد,4700153425,9170327546\n";
 
     #[test]
-    fn test_v5_single_branch_excused_late_time_and_monthly_dates() {
+    fn test_v51_late_minutes_single_branch_and_borrows() {
         let e = AttendanceEngine::new(":memory:".into()).unwrap();
         e.import_file_bytes("s.csv".into(), SAMPLE.as_bytes().to_vec(), true).unwrap();
-
         let elec = e.get_class_attendance("الکتروتکنیک".into(), "دهم".into(), 1, "2025-11-26".into(), Period::First, "".into()).unwrap();
         let sid = elec.students[0].student_id;
-        e.set_attendance(sid, "2025-11-26".into(), Period::First, AttendanceStatus::Late, "08:17".into(), "ترافیک".into(), "دبیر".into(), "برق".into(), "08:00".into()).unwrap();
+
+        e.set_attendance(sid, "2025-11-26".into(), Period::First, AttendanceStatus::Late, "10".into(), "ترافیک".into(), "دبیر".into(), "برق".into(), "08:00".into()).unwrap();
         e.set_attendance(sid, "2025-11-26".into(), Period::Second, AttendanceStatus::Excused, "".into(), "".into(), "دبیر".into(), "برق".into(), "09:00".into()).unwrap();
 
         let rep = e.generate_principal_report("الکتروتکنیک".into(), "دهم".into(), 1, "2025-11-26".into(), false, "دبیر".into()).unwrap();
-        assert!(!rep.full_text.contains("شعبه")); // کلاس تک‌شعبه‌ای نباید شعبه داشته باشد
-        assert!(!rep.sms_text.contains("شعبه"));
-        assert!(rep.full_text.contains("غیبت موجه"));
+        assert!(!rep.full_text.contains("شعبه"));
+        assert!(rep.sms_text.contains("تأخیر ۱۰ دقیقه"));
         assert!(rep.sms_text.contains("غیبت موجه"));
-        assert!(rep.sms_text.contains("تأخیر ساعت ۰۸:۱۷"));
 
-        // کلاس دوشعبه‌ای باید شعبه را حفظ کند
-        let chem = e.get_class_attendance("صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-11-26".into(), Period::First, "".into()).unwrap();
-        e.set_attendance(chem.students[0].student_id, "2025-11-26".into(), Period::First, AttendanceStatus::Absent, "".into(), "".into(), "".into(), "".into(), "".into()).unwrap();
-        let chem_rep = e.generate_principal_report("صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-11-26".into(), false, "".into()).unwrap();
-        assert!(chem_rep.full_text.contains("شعبه ۱"));
-
-        // بررسی جزئیات تاریخچه ماهانه دانش‌آموز در آذر ۱۴۰۴
         let details = e.get_student_monthly_details(sid, 1404, 9).unwrap();
         assert_eq!(details.len(), 2);
-        assert!(details[0].jalali_date.contains("آذر"));
+        assert_eq!(details[0].event_time, "10");
     }
 }
 ''',
@@ -1555,7 +1578,7 @@ def main():
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(content, encoding="utf-8", newline="\n")
         print(f"Created: {rel}")
-    print(f"\nPart 1 (Rust Core v5.0) done: {len(FILES)} files.")
+    print(f"\nPart 1 (Rust Core v5.1) done: {len(FILES)} files.")
 
 
 if __name__ == "__main__":

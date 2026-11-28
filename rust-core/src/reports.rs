@@ -8,7 +8,6 @@ use std::collections::{HashMap, HashSet};
 const P_FULL: [&str; 4] = ["زنگ اول", "زنگ دوم", "زنگ سوم", "زنگ چهارم"];
 const P_SMS: [&str; 4] = ["زنگ ۱", "زنگ ۲", "زنگ ۳", "زنگ ۴"];
 
-/// اگر کلاس در رشته و پایه خودش فقط ۱ شعبه داشته باشد، عبارت «شعبه» حذف می‌شود
 fn cls_title(major: &str, grade: &str, sec: i32, show_section: bool) -> String {
     let s = to_persian_digits(&sec.to_string());
     match (major.trim().is_empty(), show_section) {
@@ -21,24 +20,26 @@ fn cls_title(major: &str, grade: &str, sec: i32, show_section: bool) -> String {
 
 fn build_multi_section_map(all: &[ClassGroup]) -> HashMap<(String, String), bool> {
     let mut sets: HashMap<(String, String), HashSet<i32>> = HashMap::new();
-    for c in all {
-        sets.entry((c.major.clone(), c.grade.clone())).or_default().insert(c.section);
-    }
+    for c in all { sets.entry((c.major.clone(), c.grade.clone())).or_default().insert(c.section); }
     sets.into_iter().map(|(k, v)| (k, v.len() > 1)).collect()
 }
 
-fn late_suffix(time: &str, note: &str) -> String {
-    let t = to_persian_digits(time);
-    match (t.is_empty(), note.trim().is_empty()) {
-        (true, true) => "تأخیر".into(),
-        (false, true) => format!("تأخیر ساعت {t}"),
-        (true, false) => format!("تأخیر - {}", note.trim()),
-        (false, false) => format!("تأخیر ساعت {t} - {}", note.trim()),
-    }
+/// نمایش تأخیر بر اساس دقیقه (مثلاً: «تأخیر ۱۰ دقیقه») و پشتیبانی از رکوردهای قدیمی ساعتی
+fn late_suffix(val: &str, note: &str) -> String {
+    let clean = val.trim();
+    let t = to_persian_digits(clean);
+    let base = if t.is_empty() {
+        "تأخیر".to_string()
+    } else if clean.contains(':') {
+        format!("تأخیر ساعت {t}")
+    } else {
+        format!("تأخیر {t} دقیقه")
+    };
+    if note.trim().is_empty() { base } else { format!("{base} - {}", note.trim()) }
 }
 
 fn exit_suffix(time: &str, note: &str) -> String {
-    let t = to_persian_digits(time);
+    let t = to_persian_digits(time.trim());
     match (t.is_empty(), note.trim().is_empty()) {
         (true, true) => "خروج از کلاس".into(),
         (false, true) => format!("خروج ساعت {t}"),

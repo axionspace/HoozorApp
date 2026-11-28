@@ -60,7 +60,6 @@ import uniffi.hozoor_core.AttendanceStatus
 import uniffi.hozoor_core.Period
 import uniffi.hozoor_core.StudentAttendanceRow
 
-/** رفع قطعی افتادگی عدد داخل دایره‌های کوچک با حذف پدینگ عمودی فونت وزیرمتن */
 @Suppress("DEPRECATION")
 private val PeriodDotTextStyle = TextStyle(
     fontFamily = VazirmatnFontFamily,
@@ -68,10 +67,7 @@ private val PeriodDotTextStyle = TextStyle(
     lineHeight = 10.sp,
     fontWeight = FontWeight.ExtraBold,
     platformStyle = PlatformTextStyle(includeFontPadding = false),
-    lineHeightStyle = LineHeightStyle(
-        alignment = LineHeightStyle.Alignment.Center,
-        trim = LineHeightStyle.Trim.Both
-    )
+    lineHeightStyle = LineHeightStyle(alignment = LineHeightStyle.Alignment.Center, trim = LineHeightStyle.Trim.Both)
 )
 
 @Composable
@@ -120,7 +116,6 @@ fun StudentAttendanceCard(
 
                 Spacer(Modifier.width(6.dp))
 
-                // دایره‌های یکدست ۲۱dp غیرکلیکی با تراز دقیق مرکزی در هر دو حالت انتخاب‌شده و انتخاب‌نشده
                 Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
                     for (i in 0..3) {
                         val raw = student.periodStatuses.getOrElse(i) { AttendanceStatus.UNMARKED }
@@ -143,7 +138,6 @@ fun StudentAttendanceCard(
                 }
             }
 
-            // نوار نمایش ساعت برای هر دو وضعیت «تأخیر» و «خروج از کلاس»
             val showTimedBanner = student.currentStatus == AttendanceStatus.LEFT_CLASS || (student.currentStatus == AttendanceStatus.LATE && (student.eventTime.isNotBlank() || student.note.isNotBlank()))
             AnimatedVisibility(visible = showTimedBanner) {
                 val isLateBanner = student.currentStatus == AttendanceStatus.LATE
@@ -159,12 +153,20 @@ fun StudentAttendanceCard(
                         Icon(if (isLateBanner) Icons.Rounded.Schedule else Icons.Rounded.DirectionsRun, null, tint = bColor, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         val info = buildString {
-                            append(if (isLateBanner) "تأخیر در ورود" else "خروج از کلاس")
-                            if (student.eventTime.isNotBlank()) append(" ساعت ${toPersianDigits(student.eventTime)}")
+                            if (isLateBanner) {
+                                when {
+                                    student.eventTime.isBlank() -> append("تأخیر")
+                                    student.eventTime.contains(":") -> append("تأخیر ساعت ${toPersianDigits(student.eventTime)}")
+                                    else -> append("تأخیر ${toPersianDigits(student.eventTime)} دقیقه")
+                                }
+                            } else {
+                                append("خروج از کلاس")
+                                if (student.eventTime.isNotBlank()) append(" ساعت ${toPersianDigits(student.eventTime)}")
+                            }
                             if (student.note.isNotBlank()) append(" (${student.note})")
                         }
                         Text(info, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                        Text("ویرایش ساعت", style = MaterialTheme.typography.labelSmall, color = bColor, fontWeight = FontWeight.Bold)
+                        Text("ویرایش", style = MaterialTheme.typography.labelSmall, color = bColor, fontWeight = FontWeight.Bold)
                     }
                 }
             }
