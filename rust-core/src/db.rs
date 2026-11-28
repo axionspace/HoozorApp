@@ -351,7 +351,7 @@ pub fn get_student_monthly_details(conn: &Connection, student_id: i64, jy: i32, 
          ORDER BY date_iso DESC, period ASC",
     ).map_err(|e| CoreError::Database(e.to_string()))?;
 
-    st.query_map(params![student_id, s_iso, e_iso], |r| {
+    let rows = st.query_map(params![student_id, s_iso, e_iso], |r| {
         let date_iso: String = r.get(0)?;
         let period = Period::from_i32(r.get(1)?);
         let status = AttendanceStatus::from_i32(r.get(2)?);
@@ -363,7 +363,8 @@ pub fn get_student_monthly_details(conn: &Connection, student_id: i64, jy: i32, 
             event_time: r.get(3)?,
             note: r.get(4)?,
         })
-    }).map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))
+    }).map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
+    Ok(rows)
 }
 
 pub fn get_monthly_report(conn: &Connection, major: &str, grade: &str, section: i32, jy: i32, jm_i: i32) -> Result<MonthlyClassReport, CoreError> {
