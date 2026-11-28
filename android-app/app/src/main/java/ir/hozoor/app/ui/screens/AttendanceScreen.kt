@@ -140,7 +140,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
     fun buildStudentNotice(s: StudentAttendanceRow, st: AttendanceStatus): String {
         val statusText = when (st) {
             AttendanceStatus.LATE -> "با تأخیر حاضر شده است"
-            AttendanceStatus.LeftClass -> {
+            AttendanceStatus.LEFT_CLASS -> {
                 val t = if (s.exitTime.isNotBlank()) " ساعت ${toPersianDigits(s.exitTime)}" else ""
                 val r = if (s.note.isNotBlank()) " (${s.note})" else ""
                 "از کلاس خارج شده$t$r"
@@ -305,7 +305,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
     exitingStudent?.let { stu ->
         ExitTimeWheelDialog(
             student = stu,
-            onConfirm = { time, reason -> viewModel.setStudentStatus(stu.studentId, AttendanceStatus.LeftClass, time, reason) },
+            onConfirm = { time, reason -> viewModel.setStudentStatus(stu.studentId, AttendanceStatus.LEFT_CLASS, time, reason) },
             onDismiss = { exitingStudent = null }
         )
     }

@@ -74,15 +74,17 @@ jobs:
           cp "$(find vazir_tmp -name 'Vazirmatn-FD-ExtraBold.ttf' | head -n 1)" android-app/app/src/main/res/font/vazirmatn_extrabold.ttf
           rm -rf vazir.zip vazir_tmp
 
-      - name: 11. Create Release Signing Keystore
+      - name: 11. Restore Persistent Release Signing Keystore
         working-directory: android-app/app
+        env:
+          KEYSTORE_BASE64: ${{ secrets.HOZOOR_KEYSTORE_BASE64 }}
         run: |
-          keytool -genkeypair -v \
-            -keystore release.jks \
-            -alias hozoor \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass hozoor123456 -keypass hozoor123456 \
-            -dname "CN=HozoorApp, OU=Education, O=Hozoor, L=Iran, C=IR"
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "HOZOOR_KEYSTORE_BASE64 secret is missing; refusing to build with a new signing identity."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > release.jks
+          keytool -list -keystore release.jks -storepass hozoor123456 >/dev/null
 
       - name: 12. Install Gradle 8.13
         run: |
