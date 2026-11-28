@@ -29,11 +29,7 @@ import uniffi.hozoor_core.GradeCategory
 import uniffi.hozoor_core.StudentAttendanceRow
 
 @Composable
-fun StudentEditDialog(
-    editingStudent: StudentAttendanceRow?,
-    onSave: (first: String, last: String, father: String, nationalId: String, mobile: String) -> Unit,
-    onDismiss: () -> Unit
-) {
+fun StudentEditDialog(editingStudent: StudentAttendanceRow?, onSave: (String, String, String, String, String) -> Unit, onDismiss: () -> Unit) {
     var first by remember { mutableStateOf(editingStudent?.firstName.orEmpty()) }
     var last by remember { mutableStateOf(editingStudent?.lastName.orEmpty()) }
     var father by remember { mutableStateOf(editingStudent?.fatherName.orEmpty()) }
@@ -59,15 +55,7 @@ fun StudentEditDialog(
 }
 
 @Composable
-fun QuickGradeDialog(
-    studentName: String,
-    categories: List<GradeCategory>,
-    initialCategoryId: Long,
-    initialScore: String,
-    initialNote: String,
-    onSave: (categoryId: Long, score: String, note: String) -> Unit,
-    onDismiss: () -> Unit
-) {
+fun QuickGradeDialog(studentName: String, categories: List<GradeCategory>, initialCategoryId: Long, initialScore: String, initialNote: String, onSave: (Long, String, String) -> Unit, onDismiss: () -> Unit) {
     var catId by remember { mutableLongStateOf(initialCategoryId.takeIf { it > 0 } ?: categories.firstOrNull()?.id ?: 0L) }
     var score by remember { mutableStateOf(initialScore) }
     var note by remember { mutableStateOf(initialNote) }
@@ -79,9 +67,7 @@ fun QuickGradeDialog(
                 Text(studentName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 if (categories.isNotEmpty()) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(categories, key = { it.id }) { cat ->
-                            FilterChip(selected = cat.id == catId, onClick = { catId = cat.id }, label = { Text(cat.name) })
-                        }
+                        items(categories, key = { it.id }) { cat -> FilterChip(selected = cat.id == catId, onClick = { catId = cat.id }, label = { Text(cat.name) }) }
                     }
                 }
                 OutlinedTextField(value = score, onValueChange = { score = it }, label = { Text("نمره (مثلاً ۱۹.۵ یا شایسته)") }, singleLine = true, modifier = Modifier.fillMaxWidth())

@@ -8,7 +8,7 @@ pub use models::{
     AttendanceStatus, BackupStats, ClassAnalytics, ClassAttendanceSnapshot, ClassGroup, CoreError,
     GradeCategory, ImportReport, JalaliDayCell, JalaliMonthGrid, JalaliYearMonth,
     MonthlyClassReport, MonthlyStudentStat, Period, PeriodSummary, PrincipalReportBundle,
-    SavedContact, StudentAttendanceRow, StudentGradeRow, TopStudentCount,
+    SavedContact, StudentAttendanceRow, StudentGradeRow, StudentMonthlyEvent, TopStudentCount,
 };
 
 use rusqlite::Connection;
@@ -39,9 +39,9 @@ impl AttendanceEngine {
         db::get_class_attendance(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, period, &search_query)
     }
 
-    pub fn set_attendance(&self, student_id: i64, date_iso: String, period: Period, status: AttendanceStatus, exit_time: String, note: String, teacher_name: String, lesson_name: String, class_time: String) -> Result<(), CoreError> {
+    pub fn set_attendance(&self, student_id: i64, date_iso: String, period: Period, status: AttendanceStatus, event_time: String, note: String, teacher_name: String, lesson_name: String, class_time: String) -> Result<(), CoreError> {
         let mut c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
-        db::set_attendance(&mut c, student_id, &date_iso, period, status, &exit_time, &note, &teacher_name, &lesson_name, &class_time)
+        db::set_attendance(&mut c, student_id, &date_iso, period, status, &event_time, &note, &teacher_name, &lesson_name, &class_time)
     }
 
     pub fn mark_class_status(&self, major: String, grade: String, section: i32, date_iso: String, period: Period, status: AttendanceStatus, only_unmarked: bool, teacher_name: String, lesson_name: String, class_time: String) -> Result<i32, CoreError> {
@@ -112,6 +112,10 @@ impl AttendanceEngine {
         db::get_class_analytics(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section)
     }
 
+    pub fn get_student_monthly_details(&self, student_id: i64, jalali_year: i32, jalali_month: i32) -> Result<Vec<StudentMonthlyEvent>, CoreError> {
+        db::get_student_monthly_details(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, student_id, jalali_year, jalali_month)
+    }
+
     pub fn generate_period_group_message(&self, major: String, grade: String, section: i32, date_iso: String, period: Period, target_status: AttendanceStatus, teacher_name: String, lesson_name: String, whole_school: bool) -> Result<String, CoreError> {
         reports::generate_period_group_message(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, period, target_status, &teacher_name, &lesson_name, whole_school)
     }
@@ -137,7 +141,9 @@ impl AttendanceEngine {
     pub fn export_monthly_xlsx(&self, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<Vec<u8>, CoreError> {
         let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
         let r = db::get_monthly_report(&c, &major, &grade, section, jalali_year, jalali_month)?;
-        reports::export_monthly_xlsx(&r, &major, &grade, section)
+        let all = db::get_classes(&c)?;
+        let show_sec = all.iter().filter(|x| x.major == major && x.grade == grade).count() > 1;
+        reports::export_monthly_xlsx(&r, &major, &grade, section, show_sec)
     }
 
     pub fn export_monthly_csv(&self, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<String, CoreError> {
@@ -180,31 +186,37 @@ impl AttendanceEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    const SAMPLE: &str = "ردیف,نام مدرسه,رشته,پایه,شعبه,نام,نام خانوادگی,نام پدر,کد ملی,شماره موبایل\n1,نمونه,صنایع شیمیایی,یازدهم,1,محمد,آزادی,هارون,4700153423,9170327544\n";
+    const SAMPLE: &str = "ردیف,نام مدرسه,رشته,پایه,شعبه,نام,نام خانوادگی,نام پدر,کد ملی,شماره موبایل\n\
+1,نمونه,الکتروتکنیک,دهم,1,علی,رضایی,حسن,4700153423,9170327544\n\
+2,نمونه,صنایع شیمیایی,یازدهم,1,محمد,آزادی,هارون,4700153424,9170327545\n\
+3,نمونه,صنایع شیمیایی,یازدهم,2,ابراهیم,احمدی,راشد,4700153425,9170327546\n";
 
     #[test]
-    fn test_v4_left_class_gradebook_contacts_backup() {
+    fn test_v5_single_branch_excused_late_time_and_monthly_dates() {
         let e = AttendanceEngine::new(":memory:".into()).unwrap();
         e.import_file_bytes("s.csv".into(), SAMPLE.as_bytes().to_vec(), true).unwrap();
-        let snap = e.get_class_attendance("صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-10-12".into(), Period::First, "".into()).unwrap();
-        let sid = snap.students[0].student_id;
 
-        e.set_attendance(sid, "2025-10-12".into(), Period::First, AttendanceStatus::LeftClass, "09:42".into(), "برنگشت".into(), "دبیر".into(), "شیمی".into(), "08:00".into()).unwrap();
-        let rep = e.generate_principal_report("صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-10-12".into(), false, "دبیر".into()).unwrap();
-        assert!(rep.sms_text.contains("۰۹:۴۲"));
+        let elec = e.get_class_attendance("الکتروتکنیک".into(), "دهم".into(), 1, "2025-11-26".into(), Period::First, "".into()).unwrap();
+        let sid = elec.students[0].student_id;
+        e.set_attendance(sid, "2025-11-26".into(), Period::First, AttendanceStatus::Late, "08:17".into(), "ترافیک".into(), "دبیر".into(), "برق".into(), "08:00".into()).unwrap();
+        e.set_attendance(sid, "2025-11-26".into(), Period::Second, AttendanceStatus::Excused, "".into(), "".into(), "دبیر".into(), "برق".into(), "09:00".into()).unwrap();
 
-        let cats = e.get_grade_categories().unwrap();
-        assert!(cats.len() >= 9);
-        let custom_id = e.add_grade_category("مستمر بهمن".into()).unwrap();
-        e.set_student_grade(sid, custom_id, "19.5".into(), "عالی".into()).unwrap();
-        assert!(e.export_gradebook_xlsx("صنایع شیمیایی".into(), "یازدهم".into(), 1).unwrap().starts_with(b"PK\x03\x04"));
+        let rep = e.generate_principal_report("الکتروتکنیک".into(), "دهم".into(), 1, "2025-11-26".into(), false, "دبیر".into()).unwrap();
+        assert!(!rep.full_text.contains("شعبه")); // کلاس تک‌شعبه‌ای نباید شعبه داشته باشد
+        assert!(!rep.sms_text.contains("شعبه"));
+        assert!(rep.full_text.contains("غیبت موجه"));
+        assert!(rep.sms_text.contains("غیبت موجه"));
+        assert!(rep.sms_text.contains("تأخیر ساعت ۰۸:۱۷"));
 
-        e.save_contact("آقای رضایی".into(), "مدیر".into(), "09171234567".into()).unwrap();
-        let bk = e.export_backup_json().unwrap();
-        let e2 = AttendanceEngine::new(":memory:".into()).unwrap();
-        e2.restore_backup_json(bk).unwrap();
-        let st = e2.get_backup_stats().unwrap();
-        assert_eq!(st.grades_count, 1);
-        assert_eq!(st.contacts_count, 1);
+        // کلاس دوشعبه‌ای باید شعبه را حفظ کند
+        let chem = e.get_class_attendance("صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-11-26".into(), Period::First, "".into()).unwrap();
+        e.set_attendance(chem.students[0].student_id, "2025-11-26".into(), Period::First, AttendanceStatus::Absent, "".into(), "".into(), "".into(), "".into(), "".into()).unwrap();
+        let chem_rep = e.generate_principal_report("صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-11-26".into(), false, "".into()).unwrap();
+        assert!(chem_rep.full_text.contains("شعبه ۱"));
+
+        // بررسی جزئیات تاریخچه ماهانه دانش‌آموز در آذر ۱۴۰۴
+        let details = e.get_student_monthly_details(sid, 1404, 9).unwrap();
+        assert_eq!(details.len(), 2);
+        assert!(details[0].jalali_date.contains("آذر"));
     }
 }

@@ -35,7 +35,6 @@ private val ALL_PERIODS = listOf(
     Period.FOURTH to "زنگ ۴"
 )
 
-/** رفع کامل مشکل ناپدید شدن عدد زنگ کنار آیکون با تنظیم دقیق padding داخلی */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PeriodSelector(selectedPeriod: Period, onSelectPeriod: (Period) -> Unit, modifier: Modifier = Modifier) {
@@ -53,10 +52,7 @@ fun PeriodSelector(selectedPeriod: Period, onSelectPeriod: (Period) -> Unit, mod
             }
             ToggleButton(
                 checked = checked,
-                onCheckedChange = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onSelectPeriod(period)
-                },
+                onCheckedChange = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onSelectPeriod(period) },
                 modifier = Modifier.weight(1f),
                 shapes = shapes,
                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
@@ -71,13 +67,7 @@ fun PeriodSelector(selectedPeriod: Period, onSelectPeriod: (Period) -> Unit, mod
                     Icon(Icons.Rounded.NotificationsActive, null, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(2.dp))
                 }
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (checked) FontWeight.ExtraBold else FontWeight.SemiBold,
-                    maxLines = 1,
-                    softWrap = false
-                )
+                Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = if (checked) FontWeight.ExtraBold else FontWeight.SemiBold, maxLines = 1, softWrap = false)
             }
         }
     }
@@ -123,9 +113,7 @@ fun ClassCategorySelector(
     majors: List<String>, selectedMajor: String,
     grades: List<String>, selectedGrade: String,
     sections: List<Int>, selectedSection: Int,
-    onSelectMajor: (String) -> Unit,
-    onSelectGrade: (String) -> Unit,
-    onSelectSection: (Int) -> Unit,
+    onSelectMajor: (String) -> Unit, onSelectGrade: (String) -> Unit, onSelectSection: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -167,9 +155,7 @@ private fun <T> AnimatedCategoryGrid(
                         val scale by animateFloatAsState(if (isSel) 1.03f else 0.98f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium), label = "cSc")
                         Surface(
                             onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onSelect(item) },
-                            shape = RoundedCornerShape(corner),
-                            color = bg,
-                            shadowElevation = if (isSel) 3.dp else 0.dp,
+                            shape = RoundedCornerShape(corner), color = bg, shadowElevation = if (isSel) 3.dp else 0.dp,
                             modifier = Modifier.weight(1f).height(itemHeight).graphicsLayer { scaleX = scale; scaleY = scale }
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp, vertical = 4.dp)) {
@@ -185,8 +171,11 @@ private fun <T> AnimatedCategoryGrid(
 }
 ''',
 
-    "android-app/app/src/main/java/ir/hozoor/app/ui/components/ExitTimeWheelDialog.kt": r'''package ir.hozoor.app.ui.components
+    "android-app/app/src/main/java/ir/hozoor/app/ui/components/TimeWheelDialog.kt": r'''package ir.hozoor.app.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -195,23 +184,34 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccessTimeFilled
+import androidx.compose.material.icons.rounded.DirectionsRun
+import androidx.compose.material.icons.rounded.MyLocation
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -220,9 +220,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -232,81 +236,145 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.hozoor.app.ui.theme.StatusColors
+import kotlinx.coroutines.launch
+import uniffi.hozoor_core.AttendanceStatus
 import uniffi.hozoor_core.StudentAttendanceRow
 import java.time.LocalTime
 
+private val LATE_REASONS = listOf("ترافیک / سرویس", "خواب ماندن", "هماهنگ با دفتر", "تأخیر غیرموجه")
 private val EXIT_REASONS = listOf("برنگشت", "با اجازه", "دفتر / معاون", "بهداشت / آبخوری")
 
-/** دیالوگ ساده و سریع ثبت خروج از کلاس با چرخ اسکرول ساعت و دقیقه (پیش‌فرض روی ساعت لحظه‌ای گوشی) */
+/** چرخ اسکرول ساعت استوانه‌ای و مدرن برای هر دو وضعیت «تأخیر» و «خروج از کلاس» با پیش‌فرض ساعت گوشی */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ExitTimeWheelDialog(
+fun TimeWheelDialog(
     student: StudentAttendanceRow,
-    onConfirm: (exitTime: String, reason: String) -> Unit,
+    targetStatus: AttendanceStatus,
+    onConfirm: (time: String, reason: String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val isLate = targetStatus == AttendanceStatus.LATE
+    val accent = if (isLate) StatusColors.Late else StatusColors.LeftClass
+    val onAccent = if (isLate) StatusColors.OnLate else StatusColors.OnLeftClass
+    val title = if (isLate) "ثبت ساعت ورود (تأخیر)" else "ثبت ساعت خروج از کلاس"
+    val reasons = if (isLate) LATE_REASONS else EXIT_REASONS
+    val defaultReason = if (isLate) "" else "برنگشت"
+
     val now = remember { LocalTime.now() }
-    val initParts = remember(student.exitTime) {
-        val sp = student.exitTime.split(":")
+    val initParts = remember(student.eventTime, targetStatus) {
+        val useExisting = student.currentStatus == targetStatus && student.eventTime.contains(":")
+        val sp = if (useExisting) student.eventTime.split(":") else emptyList()
         val h = sp.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: now.hour
         val m = sp.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: now.minute
         h to m
     }
+
+    val hourState = rememberLazyListState(initialFirstVisibleItemIndex = initParts.first)
+    val minState = rememberLazyListState(initialFirstVisibleItemIndex = initParts.second)
+    val scope = rememberCoroutineScope()
+
     var selectedHour by remember { mutableIntStateOf(initParts.first) }
     var selectedMinute by remember { mutableIntStateOf(initParts.second) }
-    var note by remember { mutableStateOf(student.note.ifBlank { "برنگشت" }) }
+    var note by remember { mutableStateOf(if (student.currentStatus == targetStatus) student.note else defaultReason) }
 
     val formattedTime = String.format("%02d:%02d", selectedHour, selectedMinute)
+    val cardBg = MaterialTheme.colorScheme.surfaceContainerHigh
 
     Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 6.dp) {
+        Surface(shape = RoundedCornerShape(30.dp), color = cardBg, tonalElevation = 8.dp) {
             Column(modifier = Modifier.padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("ثبت خروج از کلاس", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = StatusColors.LeftClass)
-                Spacer(Modifier.height(2.dp))
-                Text("${student.firstName} ${student.lastName}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(14.dp))
-
-                // چرخ اسکرول ساعت و دقیقه (چپ به راست برای خوانش استاندارد ساعت ۰۹:۴۲)
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                        NumberWheel(count = 24, initialValue = initParts.first, label = "ساعت", onValueChange = { selectedHour = it })
-                        Text(":", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 10.dp))
-                        NumberWheel(count = 60, initialValue = initParts.second, label = "دقیقه", onValueChange = { selectedMinute = it })
+                // هدر زیبا با آیکون دایره‌ای رنگی
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Surface(shape = CircleShape, color = accent.copy(alpha = 0.18f), modifier = Modifier.size(42.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(if (isLate) Icons.Rounded.Schedule else Icons.Rounded.DirectionsRun, null, tint = accent, modifier = Modifier.size(22.dp))
+                        }
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+                        Text("${student.firstName} ${student.lastName}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton(
+                        onClick = {
+                            val cur = LocalTime.now()
+                            scope.launch {
+                                hourState.animateScrollToItem(cur.hour)
+                                minState.animateScrollToItem(cur.minute)
+                            }
+                        },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Icon(Icons.Rounded.MyLocation, null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(3.dp))
+                        Text("الان", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     }
                 }
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(10.dp))
 
-                // چیپ‌های آماده برای سرعت بالا سر کلاس
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                    EXIT_REASONS.forEach { reason ->
-                        FilterChip(
-                            selected = note == reason,
-                            onClick = { note = reason },
-                            label = { Text(reason, style = MaterialTheme.typography.labelMedium) }
-                        )
+                // نمایشگر دیجیتال زنده ساعت انتخاب‌شده
+                Surface(shape = RoundedCornerShape(20.dp), color = accent.copy(alpha = 0.14f), border = BorderStroke(1.5.dp, accent.copy(alpha = 0.45f))) {
+                    Row(modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.AccessTimeFilled, null, tint = accent, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(toPersianDigits(formattedTime), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
 
-                Spacer(Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { note = it },
-                    label = { Text("توضیح اختیاری") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
+                Spacer(Modifier.height(12.dp))
+
+                // چرخ استوانه‌ای مدرن با افکت عمق سه‌بعدی و محو شدن نرم بالا و پایین
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
+                ) {
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp, horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            ExpressiveWheelColumn(24, hourState, "ساعت", accent, MaterialTheme.colorScheme.surfaceContainerLowest) { selectedHour = it }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp)) {
+                                Box(Modifier.size(7.dp).background(accent, CircleShape))
+                                Spacer(Modifier.height(8.dp))
+                                Box(Modifier.size(7.dp).background(accent, CircleShape))
+                            }
+                            ExpressiveWheelColumn(60, minState, "دقیقه", accent, MaterialTheme.colorScheme.surfaceContainerLowest) { selectedMinute = it }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                    reasons.forEach { r ->
+                        FilterChip(selected = note == r, onClick = { note = if (note == r) "" else r }, label = { Text(r, style = MaterialTheme.typography.labelSmall) })
+                    }
+                }
+
+                Spacer(Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = note, onValueChange = { note = it },
+                    label = { Text("علت یا توضیح (اختیاری)") }, singleLine = true,
+                    shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()
                 )
 
                 Spacer(Modifier.height(14.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(0.9f)) { Text("لغو") }
+                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(0.85f)) { Text("لغو") }
                     Button(
                         onClick = { onConfirm(formattedTime, note); onDismiss() },
-                        colors = ButtonDefaults.buttonColors(containerColor = StatusColors.LeftClass, contentColor = StatusColors.OnLeftClass),
-                        modifier = Modifier.weight(1.4f)
+                        colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = onAccent),
+                        modifier = Modifier.weight(1.45f)
                     ) {
-                        Text("ثبت خروج ${toPersianDigits(formattedTime)}", fontWeight = FontWeight.ExtraBold)
+                        Text(
+                            text = if (isLate) "ثبت تأخیر ${toPersianDigits(formattedTime)}" else "ثبت خروج ${toPersianDigits(formattedTime)}",
+                            fontWeight = FontWeight.ExtraBold
+                        )
                     }
                 }
             }
@@ -315,17 +383,18 @@ fun ExitTimeWheelDialog(
 }
 
 @Composable
-private fun NumberWheel(count: Int, initialValue: Int, label: String, onValueChange: (Int) -> Unit) {
-    val itemHeight = 44.dp
+private fun ExpressiveWheelColumn(
+    count: Int, listState: LazyListState, label: String, accent: Color, fadeBg: Color, onValueChange: (Int) -> Unit
+) {
+    val itemH = 44.dp
     val halfPx = with(LocalDensity.current) { 22.dp.roundToPx() }
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialValue.coerceIn(0, count - 1))
     val fling = rememberSnapFlingBehavior(lazyListState = listState)
     val haptic = LocalHapticFeedback.current
 
     val currentVal by remember {
         derivedStateOf {
-            val offsetBoost = if (listState.firstVisibleItemScrollOffset >= halfPx) 1 else 0
-            (listState.firstVisibleItemIndex + offsetBoost).coerceIn(0, count - 1)
+            val boost = if (listState.firstVisibleItemScrollOffset >= halfPx) 1 else 0
+            (listState.firstVisibleItemIndex + boost).coerceIn(0, count - 1)
         }
     }
 
@@ -335,32 +404,41 @@ private fun NumberWheel(count: Int, initialValue: Int, label: String, onValueCha
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
-        Box(modifier = Modifier.width(84.dp).height(itemHeight * 3), contentAlignment = Alignment.Center) {
-            // نوار برجسته ردیف وسط
+        Box(modifier = Modifier.width(88.dp).height(itemH * 3), contentAlignment = Alignment.Center) {
+            // قاب کپسولی برجسته ردیف انتخاب‌شده
             Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = StatusColors.LeftClass.copy(alpha = 0.14f),
-                border = BorderStroke(1.5.dp, StatusColors.LeftClass.copy(alpha = 0.6f)),
-                modifier = Modifier.fillMaxWidth().height(itemHeight)
+                shape = RoundedCornerShape(16.dp),
+                color = accent.copy(alpha = 0.16f),
+                border = BorderStroke(1.8.dp, accent),
+                modifier = Modifier.fillMaxWidth().height(itemH)
             ) {}
 
-            LazyColumn(state = listState, flingBehavior = fling, modifier = Modifier.fillMaxWidth().height(itemHeight * 3)) {
-                item { Spacer(Modifier.height(itemHeight)) }
+            LazyColumn(state = listState, flingBehavior = fling, modifier = Modifier.fillMaxWidth().height(itemH * 3)) {
+                item { Spacer(Modifier.height(itemH)) }
                 items(count) { v ->
                     val isCenter = v == currentVal
-                    Box(modifier = Modifier.fillMaxWidth().height(itemHeight), contentAlignment = Alignment.Center) {
+                    val sc by animateFloatAsState(if (isCenter) 1.12f else 0.80f, spring(Spring.DampingRatioMediumBouncy), label = "wSc")
+                    val al by animateFloatAsState(if (isCenter) 1f else 0.36f, label = "wAl")
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(itemH).graphicsLayer { scaleX = sc; scaleY = sc; alpha = al },
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
                             text = toPersianDigits(String.format("%02d", v)),
-                            style = if (isCenter) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
-                            fontWeight = if (isCenter) FontWeight.ExtraBold else FontWeight.Normal,
-                            color = if (isCenter) StatusColors.LeftClass else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = if (isCenter) FontWeight.ExtraBold else FontWeight.Medium,
+                            color = if (isCenter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
-                item { Spacer(Modifier.height(itemHeight)) }
+                item { Spacer(Modifier.height(itemH)) }
             }
+
+            // گرادیان محوکننده بالا و پایین برای حس چرخ استوانه‌ای سه‌بعدی
+            Box(modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().height(36.dp).background(Brush.verticalGradient(listOf(fadeBg, Color.Transparent))))
+            Box(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(36.dp).background(Brush.verticalGradient(listOf(Color.Transparent, fadeBg))))
         }
     }
 }
@@ -382,6 +460,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -414,23 +493,40 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.hozoor.app.ui.theme.StatusColors
+import ir.hozoor.app.ui.theme.VazirmatnFontFamily
 import uniffi.hozoor_core.AttendanceStatus
 import uniffi.hozoor_core.Period
 import uniffi.hozoor_core.StudentAttendanceRow
 
-/** کارت مدرن با دایره‌های کوچک غیرکلیکی ۱ تا ۴ (حاشیه سفید برای زنگ فعال، بدون بریدن نام دانش‌آموز) + وضعیت خروج از کلاس */
+/** رفع قطعی افتادگی عدد داخل دایره‌های کوچک با حذف پدینگ عمودی فونت وزیرمتن */
+@Suppress("DEPRECATION")
+private val PeriodDotTextStyle = TextStyle(
+    fontFamily = VazirmatnFontFamily,
+    fontSize = 10.sp,
+    lineHeight = 10.sp,
+    fontWeight = FontWeight.ExtraBold,
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Center,
+        trim = LineHeightStyle.Trim.Both
+    )
+)
+
 @Composable
 fun StudentAttendanceCard(
     indexInClass: Int,
     student: StudentAttendanceRow,
     selectedPeriod: Period,
     onStatusChange: (AttendanceStatus) -> Unit,
-    onRequestLeftClass: () -> Unit,
+    onRequestTimedStatus: (AttendanceStatus) -> Unit,
     onSendIndividualNotice: (StudentAttendanceRow, AttendanceStatus) -> Unit,
     onCallParent: (String) -> Unit,
     onQuickGrade: (StudentAttendanceRow) -> Unit,
@@ -460,29 +556,17 @@ fun StudentAttendanceCard(
                 Spacer(Modifier.width(9.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "${student.firstName} ${student.lastName}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Text("${student.firstName} ${student.lastName}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     val meta = buildString {
                         if (student.fatherName.isNotBlank()) append("فرزند ${student.fatherName}")
-                        if (student.latestGrade.isNotBlank()) {
-                            if (isNotEmpty()) append(" • ")
-                            append("آخرین نمره: ${toPersianDigits(student.latestGrade)}")
-                        }
+                        if (student.latestGrade.isNotBlank()) { if (isNotEmpty()) append(" • "); append("آخرین نمره: ${toPersianDigits(student.latestGrade)}") }
                     }
-                    if (meta.isNotBlank()) {
-                        Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
+                    if (meta.isNotBlank()) Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
 
                 Spacer(Modifier.width(6.dp))
 
-                // عددهای کوچک ۱ تا ۴ (غیرکلیکی، حاشیه سفید روی زنگ فعال، بدون اشغال فضای نام)
+                // دایره‌های یکدست ۲۱dp غیرکلیکی با تراز دقیق مرکزی در هر دو حالت انتخاب‌شده و انتخاب‌نشده
                 Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
                     for (i in 0..3) {
                         val raw = student.periodStatuses.getOrElse(i) { AttendanceStatus.UNMARKED }
@@ -495,42 +579,44 @@ fun StudentAttendanceCard(
                             color = dotBg,
                             border = if (isAct) BorderStroke(1.8.dp, Color.White) else null,
                             shadowElevation = if (isAct) 2.dp else 0.dp,
-                            modifier = Modifier.size(if (isAct) 22.dp else 19.dp)
+                            modifier = Modifier.size(21.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(toPersianDigits((i + 1).toString()), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = dotFg)
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Text(text = toPersianDigits((i + 1).toString()), style = PeriodDotTextStyle, color = dotFg)
                             }
                         }
                     }
                 }
             }
 
-            // نمایش برچسب ساعت خروج از کلاس (قابل لمس برای ویرایش ساعت خروج)
-            AnimatedVisibility(visible = student.currentStatus == AttendanceStatus.LEFT_CLASS) {
+            // نوار نمایش ساعت برای هر دو وضعیت «تأخیر» و «خروج از کلاس»
+            val showTimedBanner = student.currentStatus == AttendanceStatus.LEFT_CLASS || (student.currentStatus == AttendanceStatus.LATE && (student.eventTime.isNotBlank() || student.note.isNotBlank()))
+            AnimatedVisibility(visible = showTimedBanner) {
+                val isLateBanner = student.currentStatus == AttendanceStatus.LATE
+                val bColor = if (isLateBanner) StatusColors.Late else StatusColors.LeftClass
                 Surface(
-                    onClick = onRequestLeftClass,
+                    onClick = { onRequestTimedStatus(student.currentStatus) },
                     shape = RoundedCornerShape(12.dp),
-                    color = StatusColors.LeftClass.copy(alpha = 0.14f),
-                    border = BorderStroke(1.dp, StatusColors.LeftClass.copy(alpha = 0.5f)),
+                    color = bColor.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, bColor.copy(alpha = 0.5f)),
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 ) {
                     Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.DirectionsRun, null, tint = StatusColors.LeftClass, modifier = Modifier.size(16.dp))
+                        Icon(if (isLateBanner) Icons.Rounded.Schedule else Icons.Rounded.DirectionsRun, null, tint = bColor, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         val info = buildString {
-                            append("خروج از کلاس")
-                            if (student.exitTime.isNotBlank()) append(" ساعت ${toPersianDigits(student.exitTime)}")
+                            append(if (isLateBanner) "تأخیر در ورود" else "خروج از کلاس")
+                            if (student.eventTime.isNotBlank()) append(" ساعت ${toPersianDigits(student.eventTime)}")
                             if (student.note.isNotBlank()) append(" (${student.note})")
                         }
-                        Text(info, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = StatusColors.LeftClass, modifier = Modifier.weight(1f))
-                        Text("تغییر ساعت", style = MaterialTheme.typography.labelSmall, color = StatusColors.LeftClass)
+                        Text(info, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                        Text("ویرایش ساعت", style = MaterialTheme.typography.labelSmall, color = bColor, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
             Spacer(Modifier.height(10.dp))
 
-            // ۵ وضعیت با انیمیشن فنری: حاضر، غایب، تأخیر، موجه، خروج
             Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth().padding(3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                     AnimatedStatusPill("حاضر", Icons.Rounded.Check, student.currentStatus == AttendanceStatus.PRESENT, StatusColors.Present, StatusColors.OnPresent, Modifier.weight(1f)) {
@@ -540,13 +626,13 @@ fun StudentAttendanceCard(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress); onStatusChange(AttendanceStatus.ABSENT)
                     }
                     AnimatedStatusPill("تأخیر", Icons.Rounded.Schedule, student.currentStatus == AttendanceStatus.LATE, StatusColors.Late, StatusColors.OnLate, Modifier.weight(1f)) {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onStatusChange(AttendanceStatus.LATE)
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress); onRequestTimedStatus(AttendanceStatus.LATE)
                     }
                     AnimatedStatusPill("موجه", Icons.Rounded.VerifiedUser, student.currentStatus == AttendanceStatus.EXCUSED, StatusColors.Excused, StatusColors.OnExcused, Modifier.weight(1f)) {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onStatusChange(AttendanceStatus.EXCUSED)
                     }
                     AnimatedStatusPill("خروج", Icons.Rounded.DirectionsRun, student.currentStatus == AttendanceStatus.LEFT_CLASS, StatusColors.LeftClass, StatusColors.OnLeftClass, Modifier.weight(1f)) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress); onRequestLeftClass()
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress); onRequestTimedStatus(AttendanceStatus.LEFT_CLASS)
                     }
                 }
             }
@@ -583,8 +669,7 @@ private fun AnimatedStatusPill(label: String, icon: ImageVector, selected: Boole
 
     Column(
         modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }.clip(RoundedCornerShape(corner)).background(bg).clickable(onClick = onClick).padding(vertical = 6.dp, horizontal = 2.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
     ) {
         Icon(icon, label, tint = fg, modifier = Modifier.size(15.dp))
         Text(label, fontSize = 11.sp, fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold, color = fg, maxLines = 1, softWrap = false)
@@ -597,11 +682,9 @@ private fun ActionPill(label: String, icon: ImageVector, enabled: Boolean, bg: C
     val aFg by animateColorAsState(if (enabled) fg else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f), label = "aFg")
     Row(
         modifier = modifier.clip(RoundedCornerShape(13.dp)).background(aBg).clickable(enabled = enabled, onClick = onClick).padding(vertical = 7.dp, horizontal = 6.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
+        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, label, tint = aFg, modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(4.dp))
+        Icon(icon, label, tint = aFg, modifier = Modifier.size(15.dp)); Spacer(Modifier.width(4.dp))
         Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = aFg, maxLines = 1)
     }
 }
@@ -763,11 +846,7 @@ import uniffi.hozoor_core.GradeCategory
 import uniffi.hozoor_core.StudentAttendanceRow
 
 @Composable
-fun StudentEditDialog(
-    editingStudent: StudentAttendanceRow?,
-    onSave: (first: String, last: String, father: String, nationalId: String, mobile: String) -> Unit,
-    onDismiss: () -> Unit
-) {
+fun StudentEditDialog(editingStudent: StudentAttendanceRow?, onSave: (String, String, String, String, String) -> Unit, onDismiss: () -> Unit) {
     var first by remember { mutableStateOf(editingStudent?.firstName.orEmpty()) }
     var last by remember { mutableStateOf(editingStudent?.lastName.orEmpty()) }
     var father by remember { mutableStateOf(editingStudent?.fatherName.orEmpty()) }
@@ -793,15 +872,7 @@ fun StudentEditDialog(
 }
 
 @Composable
-fun QuickGradeDialog(
-    studentName: String,
-    categories: List<GradeCategory>,
-    initialCategoryId: Long,
-    initialScore: String,
-    initialNote: String,
-    onSave: (categoryId: Long, score: String, note: String) -> Unit,
-    onDismiss: () -> Unit
-) {
+fun QuickGradeDialog(studentName: String, categories: List<GradeCategory>, initialCategoryId: Long, initialScore: String, initialNote: String, onSave: (Long, String, String) -> Unit, onDismiss: () -> Unit) {
     var catId by remember { mutableLongStateOf(initialCategoryId.takeIf { it > 0 } ?: categories.firstOrNull()?.id ?: 0L) }
     var score by remember { mutableStateOf(initialScore) }
     var note by remember { mutableStateOf(initialNote) }
@@ -813,9 +884,7 @@ fun QuickGradeDialog(
                 Text(studentName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
                 if (categories.isNotEmpty()) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(categories, key = { it.id }) { cat ->
-                            FilterChip(selected = cat.id == catId, onClick = { catId = cat.id }, label = { Text(cat.name) })
-                        }
+                        items(categories, key = { it.id }) { cat -> FilterChip(selected = cat.id == catId, onClick = { catId = cat.id }, label = { Text(cat.name) }) }
                     }
                 }
                 OutlinedTextField(value = score, onValueChange = { score = it }, label = { Text("نمره (مثلاً ۱۹.۵ یا شایسته)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -850,23 +919,13 @@ import uniffi.hozoor_core.Period
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ExpressiveAttendanceToolbar(
-    selectedPeriod: Period,
-    onResetAllPresent: () -> Unit,
-    onCopyFromPrevious: () -> Unit,
-    onAddStudent: () -> Unit,
-    onOpenExportSheet: () -> Unit,
-    onImportFile: () -> Unit,
-    modifier: Modifier = Modifier
+    selectedPeriod: Period, onResetAllPresent: () -> Unit, onCopyFromPrevious: () -> Unit,
+    onAddStudent: () -> Unit, onOpenExportSheet: () -> Unit, onImportFile: () -> Unit, modifier: Modifier = Modifier
 ) {
     HorizontalFloatingToolbar(
-        expanded = true,
-        modifier = modifier,
+        expanded = true, modifier = modifier,
         colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
-        floatingActionButton = {
-            FloatingToolbarDefaults.VibrantFloatingActionButton(onClick = onImportFile) {
-                Icon(Icons.Rounded.UploadFile, "ورود اکسل یا CSV")
-            }
-        }
+        floatingActionButton = { FloatingToolbarDefaults.VibrantFloatingActionButton(onClick = onImportFile) { Icon(Icons.Rounded.UploadFile, "ورود اکسل یا CSV") } }
     ) {
         IconButton(onClick = onResetAllPresent) { Icon(Icons.Rounded.DoneAll, "همه حاضر") }
         IconButton(onClick = onCopyFromPrevious, enabled = selectedPeriod != Period.FIRST) { Icon(Icons.Rounded.ContentCopy, "کپی زنگ قبل") }
@@ -936,7 +995,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import ir.hozoor.app.ui.theme.StatusColors
 import uniffi.hozoor_core.AttendanceStatus
 import uniffi.hozoor_core.BackupStats
 import uniffi.hozoor_core.PeriodSummary
@@ -944,7 +1002,6 @@ import uniffi.hozoor_core.PrincipalReportBundle
 import uniffi.hozoor_core.SavedContact
 import uniffi.hozoor_core.StudentAttendanceRow
 
-/** مرکز کامل ارسال و اشتراک‌گذاری: انتخاب از مخاطبین گوشی، ویرایش متن، پیامک، واتساپ، پیام‌رسان، اطلاع‌رسانی اولیا و پشتیبان */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportAndReportSheet(
@@ -961,11 +1018,11 @@ fun ExportAndReportSheet(
     onRecipientPhoneChange: (String) -> Unit,
     onPickPhoneContact: () -> Unit,
     onSelectSavedContact: (SavedContact) -> Unit,
-    onSaveCurrentContact: (name: String, phone: String) -> Unit,
+    onSaveCurrentContact: (String, String) -> Unit,
     onDeleteSavedContact: (Long) -> Unit,
     onLoadPeriodGroupMessage: (AttendanceStatus, (String) -> Unit) -> Unit,
-    onSendSms: (phone: String, text: String) -> Unit,
-    onSendWhatsApp: (phone: String, text: String) -> Unit,
+    onSendSms: (String, String) -> Unit,
+    onSendWhatsApp: (String, String) -> Unit,
     onShareText: (String) -> Unit,
     onCopyText: (String) -> Unit,
     onNotifyParentSms: (StudentAttendanceRow) -> Unit,
@@ -979,7 +1036,6 @@ fun ExportAndReportSheet(
     onRestoreBackupJson: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    // 0=گزارش کامل، 1=پیامک فشرده، 2=غایبین این زنگ، 3=تأخیری این زنگ، 4=خروج از کلاس
     var msgMode by remember { mutableIntStateOf(0) }
     var editableText by remember { mutableStateOf("") }
     var contactLabel by remember(recipientName) { mutableStateOf(recipientName.ifBlank { "مدیر" }) }
@@ -1008,7 +1064,6 @@ fun ExportAndReportSheet(
                 }
             }
 
-            // ۱) بخش انتخاب مخاطب از گوشی و مخاطبین ذخیره‌شده
             Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1038,24 +1093,8 @@ fun ExportAndReportSheet(
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = recipientPhone,
-                            onValueChange = onRecipientPhoneChange,
-                            label = { Text("شماره گیرنده") },
-                            placeholder = { Text("0917xxxxxxx") },
-                            leadingIcon = { Icon(Icons.Rounded.Phone, null) },
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.weight(1.3f)
-                        )
-                        OutlinedTextField(
-                            value = contactLabel,
-                            onValueChange = { contactLabel = it },
-                            label = { Text("نام") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.weight(0.8f)
-                        )
+                        OutlinedTextField(value = recipientPhone, onValueChange = onRecipientPhoneChange, label = { Text("شماره گیرنده") }, placeholder = { Text("0917xxxxxxx") }, leadingIcon = { Icon(Icons.Rounded.Phone, null) }, singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.weight(1.3f))
+                        OutlinedTextField(value = contactLabel, onValueChange = { contactLabel = it }, label = { Text("نام") }, singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.weight(0.8f))
                         IconButton(onClick = { onSaveCurrentContact(contactLabel, recipientPhone) }) {
                             Icon(Icons.Rounded.BookmarkAdd, "ذخیره مخاطب", tint = MaterialTheme.colorScheme.primary)
                         }
@@ -1063,7 +1102,6 @@ fun ExportAndReportSheet(
                 }
             }
 
-            // ۲) انتخاب گستره و نوع گزارش
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterChip(selected = !wholeSchool, onClick = { onToggleWholeSchool(false); msgMode = 0 }, label = { Text("کلاس فعلی") })
                 FilterChip(selected = wholeSchool, onClick = { onToggleWholeSchool(true); msgMode = 0 }, label = { Text("کل کلاس‌ها") })
@@ -1072,52 +1110,18 @@ fun ExportAndReportSheet(
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 item { FilterChip(selected = msgMode == 0, onClick = { msgMode = 0 }, label = { Text("گزارش کامل روز") }) }
                 item { FilterChip(selected = msgMode == 1, onClick = { msgMode = 1 }, label = { Text("پیامک فشرده روز") }) }
-                item {
-                    FilterChip(
-                        selected = msgMode == 2,
-                        onClick = { onLoadPeriodGroupMessage(AttendanceStatus.ABSENT) { txt -> msgMode = 2; editableText = txt } },
-                        label = { Text("غیبت این زنگ (${toPersianDigits(summary.absent.toString())})") }
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = msgMode == 3,
-                        onClick = { onLoadPeriodGroupMessage(AttendanceStatus.LATE) { txt -> msgMode = 3; editableText = txt } },
-                        label = { Text("تأخیر (${toPersianDigits(summary.late.toString())})") }
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = msgMode == 4,
-                        onClick = { onLoadPeriodGroupMessage(AttendanceStatus.LEFT_CLASS) { txt -> msgMode = 4; editableText = txt } },
-                        label = { Text("خروج از کلاس (${toPersianDigits(summary.leftClass.toString())})") }
-                    )
-                }
+                item { FilterChip(selected = msgMode == 2, onClick = { onLoadPeriodGroupMessage(AttendanceStatus.ABSENT) { msgMode = 2; editableText = it } }, label = { Text("غیبت این زنگ (${toPersianDigits(summary.absent.toString())})") }) }
+                item { FilterChip(selected = msgMode == 3, onClick = { onLoadPeriodGroupMessage(AttendanceStatus.LATE) { msgMode = 3; editableText = it } }, label = { Text("تأخیر (${toPersianDigits(summary.late.toString())})") }) }
+                item { FilterChip(selected = msgMode == 4, onClick = { onLoadPeriodGroupMessage(AttendanceStatus.LEFT_CLASS) { msgMode = 4; editableText = it } }, label = { Text("خروج از کلاس (${toPersianDigits(summary.leftClass.toString())})") }) }
             }
 
-            // کادر متن قابل ویرایش مستقیم قبل از ارسال
-            OutlinedTextField(
-                value = editableText,
-                onValueChange = { editableText = it },
-                label = { Text("متن آماده ارسال (قابل ویرایش دستی)") },
-                minLines = 4,
-                maxLines = 9,
-                shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth()
-            )
+            OutlinedTextField(value = editableText, onValueChange = { editableText = it }, label = { Text("متن آماده ارسال (قابل ویرایش دستی)") }, minLines = 4, maxLines = 9, shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth())
 
-            // دکمه‌های ارسال چندکاناله: پیامک، واتساپ، پیام‌رسان‌ها، کپی
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Button(onClick = { onSendSms(recipientPhone, editableText) }, enabled = editableText.isNotBlank(), modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp)) {
                     Icon(Icons.Rounded.Sms, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("پیامک عادی", maxLines = 1)
                 }
-                Button(
-                    onClick = { onSendWhatsApp(recipientPhone, editableText) },
-                    enabled = editableText.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A), contentColor = Color.White),
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp)
-                ) {
+                Button(onClick = { onSendWhatsApp(recipientPhone, editableText) }, enabled = editableText.isNotBlank(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A), contentColor = Color.White), modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp)) {
                     Icon(Icons.Rounded.Chat, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("واتساپ", maxLines = 1)
                 }
             }
@@ -1130,7 +1134,6 @@ fun ExportAndReportSheet(
                 }
             }
 
-            // ۳) اطلاع‌رسانی سریع به اولیای دانش‌آموزان غایب/تأخیر/خروج
             if (flaggedStudents.isNotEmpty()) {
                 HorizontalDivider()
                 Text("اطلاع‌رسانی مستقیم به اولیا (${toPersianDigits(flaggedStudents.size.toString())} نفر)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold)
@@ -1139,11 +1142,12 @@ fun ExportAndReportSheet(
                         Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("${st.firstName} ${st.lastName}", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                                Text(
-                                    text = if (st.currentStatus == AttendanceStatus.LEFT_CLASS && st.exitTime.isNotBlank()) "خروج ${toPersianDigits(st.exitTime)}" else st.currentStatus.labelFa(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = statusPrimaryColor(st.currentStatus)
-                                )
+                                val subtitle = when {
+                                    st.currentStatus == AttendanceStatus.LEFT_CLASS && st.eventTime.isNotBlank() -> "خروج ساعت ${toPersianDigits(st.eventTime)}"
+                                    st.currentStatus == AttendanceStatus.LATE && st.eventTime.isNotBlank() -> "تأخیر ساعت ${toPersianDigits(st.eventTime)}"
+                                    else -> statusLabelFa(st.currentStatus)
+                                }
+                                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = statusPrimaryColor(st.currentStatus))
                             }
                             IconButton(onClick = { onNotifyParentSms(st) }) { Icon(Icons.Rounded.Sms, "پیامک ولی", tint = MaterialTheme.colorScheme.primary) }
                             IconButton(onClick = { onNotifyParentWhatsApp(st) }) { Icon(Icons.Rounded.Chat, "واتساپ ولی", tint = Color(0xFF16A34A)) }
@@ -1153,8 +1157,6 @@ fun ExportAndReportSheet(
             }
 
             HorizontalDivider()
-
-            // ۴) فایل‌های اکسل و CSV
             Text("خروجی اکسل و CSV", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalButton(onClick = onExportDailyExcel, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.TableChart, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("اکسل حضور") }
@@ -1166,9 +1168,7 @@ fun ExportAndReportSheet(
             }
 
             HorizontalDivider()
-
-            // ۵) پشتیبان‌گیری کلی از تمام اطلاعات
-            Text("پشتیبان‌گیری کلی (دانش‌آموزان، حضور، خروج، نمرات و مخاطبین)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text("پشتیبان‌گیری کلی", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             if (backupStats != null) {
                 Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
                     Text(
@@ -1186,10 +1186,10 @@ fun ExportAndReportSheet(
     }
 }
 
-private fun AttendanceStatus.labelFa(): String = when (this) {
+fun statusLabelFa(st: AttendanceStatus): String = when (st) {
     AttendanceStatus.ABSENT -> "غایب"
     AttendanceStatus.LATE -> "تأخیر"
-    AttendanceStatus.EXCUSED -> "موجه"
+    AttendanceStatus.EXCUSED -> "غیبت موجه"
     AttendanceStatus.LEFT_CLASS -> "خروج از کلاس"
     else -> "حاضر"
 }
@@ -1204,7 +1204,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -1215,7 +1214,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.TableChart
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
@@ -1240,10 +1241,10 @@ import androidx.compose.ui.window.Dialog
 import ir.hozoor.app.ui.components.ClassCategorySelector
 import ir.hozoor.app.ui.components.QuickGradeDialog
 import ir.hozoor.app.ui.components.toPersianDigits
+import ir.hozoor.app.util.FileShareHelper
 import uniffi.hozoor_core.GradeCategory
 import uniffi.hozoor_core.StudentGradeRow
 
-/** دفتر نمره کامل: مستمر مهر/آبان/آذر/دی، پودمانی ۱ تا ۵ و امکان ساخت هر عنوان دلخواه توسط معلم */
 @Composable
 fun GradebookContent(
     majors: List<String>, selectedMajor: String,
@@ -1253,21 +1254,27 @@ fun GradebookContent(
     categories: List<GradeCategory>,
     selectedCategoryId: Long,
     studentGrades: List<StudentGradeRow>,
+    searchQuery: String,
+    onSearchChange: (String) -> Unit,
     onSelectCategory: (Long) -> Unit,
     onAddCategory: (String) -> Unit,
     onDeleteCategory: (Long) -> Unit,
-    onSaveGrade: (studentId: Long, categoryId: Long, score: String, note: String) -> Unit,
+    onSaveGrade: (Long, Long, String, String) -> Unit,
     onExportGradebookExcel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showAddCatDialog by remember { mutableStateOf(false) }
     var editingRow by remember { mutableStateOf<StudentGradeRow?>(null) }
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 32.dp, top = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
+    val filtered = remember(studentGrades, searchQuery) {
+        val q = FileShareHelper.normalizePersianSearch(searchQuery)
+        if (q.isEmpty()) studentGrades
+        else studentGrades.filter { r ->
+            FileShareHelper.normalizePersianSearch("${r.firstName} ${r.lastName} ${r.fatherName} ${r.score}").contains(q)
+        }
+    }
+
+    LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp, top = 2.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item(key = "gb_cats") {
             ClassCategorySelector(majors, selectedMajor, grades, selectedGrade, sections, selectedSection, onSelectMajor, onSelectGrade, onSelectSection)
         }
@@ -1284,11 +1291,7 @@ fun GradebookContent(
 
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         items(categories, key = { it.id }) { cat ->
-                            FilterChip(
-                                selected = cat.id == selectedCategoryId,
-                                onClick = { onSelectCategory(cat.id) },
-                                label = { Text(cat.name, fontWeight = if (cat.id == selectedCategoryId) FontWeight.ExtraBold else FontWeight.Medium) }
-                            )
+                            FilterChip(selected = cat.id == selectedCategoryId, onClick = { onSelectCategory(cat.id) }, label = { Text(cat.name, fontWeight = if (cat.id == selectedCategoryId) FontWeight.ExtraBold else FontWeight.Medium) })
                         }
                     }
 
@@ -1297,22 +1300,33 @@ fun GradebookContent(
                             Icon(Icons.Rounded.TableChart, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("خروجی اکسل دفتر نمره")
                         }
                         if (categories.size > 1 && selectedCategoryId > 0) {
-                            IconButton(onClick = { onDeleteCategory(selectedCategoryId) }) {
-                                Icon(Icons.Rounded.Delete, "حذف این عنوان", tint = MaterialTheme.colorScheme.error)
-                            }
+                            IconButton(onClick = { onDeleteCategory(selectedCategoryId) }) { Icon(Icons.Rounded.Delete, "حذف عنوان", tint = MaterialTheme.colorScheme.error) }
                         }
                     }
                 }
             }
         }
 
-        itemsIndexed(studentGrades, key = { _, r -> r.studentId }) { idx, row ->
-            Surface(
-                onClick = { editingRow = row },
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
+        // باکس جستجو در دفتر نمره
+        item(key = "gb_search") {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchChange,
+                placeholder = { Text("جستجوی دانش‌آموز در دفتر نمره...") },
+                leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { onSearchChange("") }) { Icon(Icons.Rounded.Close, "پاک کردن") }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(22.dp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-            ) {
+            )
+        }
+
+        itemsIndexed(filtered, key = { _, r -> r.studentId }) { idx, row ->
+            Surface(onClick = { editingRow = row }, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 Row(modifier = Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("${toPersianDigits((idx + 1).toString())}. ${row.firstName} ${row.lastName}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -1322,14 +1336,10 @@ fun GradebookContent(
                         }
                         if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = if (row.score.isNotBlank()) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
-                    ) {
+                    Surface(shape = RoundedCornerShape(14.dp), color = if (row.score.isNotBlank()) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh) {
                         Text(
                             text = if (row.score.isNotBlank()) toPersianDigits(row.score) else "ثبت نمره",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.ExtraBold,
+                            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.ExtraBold,
                             color = if (row.score.isNotBlank()) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                         )
@@ -1356,15 +1366,7 @@ fun GradebookContent(
     }
 
     editingRow?.let { row ->
-        QuickGradeDialog(
-            studentName = "${row.firstName} ${row.lastName}",
-            categories = categories,
-            initialCategoryId = selectedCategoryId,
-            initialScore = row.score,
-            initialNote = row.note,
-            onSave = { cid, sc, nt -> onSaveGrade(row.studentId, cid, sc, nt) },
-            onDismiss = { editingRow = null }
-        )
+        QuickGradeDialog("${row.firstName} ${row.lastName}", categories, selectedCategoryId, row.score, row.note, { cid, sc, nt -> onSaveGrade(row.studentId, cid, sc, nt) }) { editingRow = null }
     }
 }
 ''',
@@ -1379,18 +1381,26 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.TableChart
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -1400,6 +1410,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -1409,12 +1420,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import ir.hozoor.app.ui.components.ClassCategorySelector
+import ir.hozoor.app.ui.components.statusLabelFa
+import ir.hozoor.app.ui.components.statusOnColor
+import ir.hozoor.app.ui.components.statusPrimaryColor
 import ir.hozoor.app.ui.components.toPersianDigits
 import ir.hozoor.app.ui.theme.StatusColors
+import ir.hozoor.app.util.FileShareHelper
+import uniffi.hozoor_core.AttendanceStatus
 import uniffi.hozoor_core.ClassAnalytics
 import uniffi.hozoor_core.MonthlyClassReport
 import uniffi.hozoor_core.MonthlyStudentStat
+import uniffi.hozoor_core.StudentMonthlyEvent
 import uniffi.hozoor_core.TopStudentCount
 import java.util.Locale
 
@@ -1426,17 +1444,27 @@ fun MonthlyReportContent(
     onSelectMajor: (String) -> Unit, onSelectGrade: (String) -> Unit, onSelectSection: (Int) -> Unit,
     analytics: ClassAnalytics?,
     report: MonthlyClassReport?,
+    searchQuery: String,
+    onSearchChange: (String) -> Unit,
     sortByAbsence: Boolean,
     onShiftMonth: (Int) -> Unit,
     onToggleSort: () -> Unit,
+    onInspectStudent: (MonthlyStudentStat) -> Unit,
+    inspectingStudent: MonthlyStudentStat?,
+    inspectingEvents: List<StudentMonthlyEvent>,
+    onDismissInspect: () -> Unit,
     onExportExcel: () -> Unit,
     onExportCsv: () -> Unit,
     onRequestDeleteClass: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val students = remember(report, sortByAbsence) {
-        val list = report?.students.orEmpty()
-        if (sortByAbsence) list.sortedByDescending { it.absentPeriods + it.leftClassPeriods } else list
+    val students = remember(report, sortByAbsence, searchQuery) {
+        val base = report?.students.orEmpty()
+        val q = FileShareHelper.normalizePersianSearch(searchQuery)
+        val searched = if (q.isEmpty()) base else base.filter { s ->
+            FileShareHelper.normalizePersianSearch("${s.firstName} ${s.lastName} ${s.fatherName} ${s.nationalId}").contains(q)
+        }
+        if (sortByAbsence) searched.sortedByDescending { it.absentPeriods + it.leftClassPeriods } else searched
     }
 
     LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 36.dp, top = 2.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1453,7 +1481,7 @@ fun MonthlyReportContent(
                             MonthlyKpi("جلسه", toPersianDigits(analytics.recordedSessions.toString()), MaterialTheme.colorScheme.primary)
                             MonthlyKpi("غایب", toPersianDigits(analytics.totalAbsent.toString()), StatusColors.Absent)
                             MonthlyKpi("تأخیر", toPersianDigits(analytics.totalLate.toString()), StatusColors.Late)
-                            MonthlyKpi("موجه", toPersianDigits(analytics.totalExcused.toString()), StatusColors.Excused)
+                            MonthlyKpi("غیبت موجه", toPersianDigits(analytics.totalExcused.toString()), StatusColors.Excused)
                             MonthlyKpi("خروج", toPersianDigits(analytics.totalLeftClass.toString()), StatusColors.LeftClass)
                         }
                         HorizontalDivider()
@@ -1473,7 +1501,7 @@ fun MonthlyReportContent(
                         IconButton(onClick = { onShiftMonth(-1) }) { Icon(Icons.Rounded.ChevronRight, "ماه قبل") }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(report?.monthLabel ?: "—", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                            Text("روزهای ثبت‌شده: ${toPersianDigits((report?.recordedDays ?: 0).toString())} روز", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("روزهای ثبت‌شده: ${toPersianDigits((report?.recordedDays ?: 0).toString())} روز • لمس نام = تاریخ غیبت‌ها", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconButton(onClick = { onShiftMonth(1) }) { Icon(Icons.Rounded.ChevronLeft, "ماه بعد") }
                     }
@@ -1493,7 +1521,27 @@ fun MonthlyReportContent(
             }
         }
 
-        itemsIndexed(students, key = { _, s -> s.studentId }) { idx, stat -> MonthlyStudentCard(idx + 1, stat) }
+        // باکس جستجو در آمار و گزارش ماهانه
+        item(key = "m_search") {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchChange,
+                placeholder = { Text("جستجوی دانش‌آموز در گزارش ماهانه...") },
+                leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { onSearchChange("") }) { Icon(Icons.Rounded.Close, "پاک کردن") }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(22.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            )
+        }
+
+        itemsIndexed(students, key = { _, s -> s.studentId }) { idx, stat ->
+            MonthlyStudentCard(index = idx + 1, stat = stat, onClick = { onInspectStudent(stat) })
+        }
 
         item(key = "m_del") {
             OutlinedButton(
@@ -1501,6 +1549,89 @@ fun MonthlyReportContent(
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
             ) { Icon(Icons.Rounded.DeleteSweep, null); Spacer(Modifier.width(6.dp)); Text("حذف کامل این کلاس و سوابقش") }
+        }
+    }
+
+    // باکس نمایش تاریخ دقیق غیبت‌ها، تأخیرها، غیبت‌های موجه و خروج‌های دانش‌آموز در ماه انتخاب‌شده
+    if (inspectingStudent != null) {
+        StudentMonthlyDetailsDialog(
+            student = inspectingStudent,
+            monthLabel = report?.monthLabel.orEmpty(),
+            events = inspectingEvents,
+            onDismiss = onDismissInspect
+        )
+    }
+}
+
+@Composable
+private fun StudentMonthlyDetailsDialog(
+    student: MonthlyStudentStat,
+    monthLabel: String,
+    events: List<StudentMonthlyEvent>,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, tonalElevation = 8.dp) {
+            Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.CalendarMonth, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("${student.firstName} ${student.lastName}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                        Text("تاریخچه غیبت‌ها و تأخیرها در $monthLabel", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // خلاصه سریع
+                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        MonthlyKpi("غایب", toPersianDigits(student.absentPeriods.toString()), StatusColors.Absent)
+                        MonthlyKpi("تأخیر", toPersianDigits(student.latePeriods.toString()), StatusColors.Late)
+                        MonthlyKpi("غیبت موجه", toPersianDigits(student.excusedPeriods.toString()), StatusColors.Excused)
+                        MonthlyKpi("خروج", toPersianDigits(student.leftClassPeriods.toString()), StatusColors.LeftClass)
+                    }
+                }
+
+                if (events.isEmpty()) {
+                    Surface(shape = RoundedCornerShape(16.dp), color = StatusColors.Present.copy(alpha = 0.14f), modifier = Modifier.fillMaxWidth()) {
+                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.CheckCircle, null, tint = StatusColors.Present)
+                            Spacer(Modifier.width(8.dp))
+                            Text("در $monthLabel هیچ غیبت، تأخیر یا خروجی برای این دانش‌آموز ثبت نشده است.", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(events) { ev ->
+                            val stColor = statusPrimaryColor(ev.status)
+                            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
+                                Row(modifier = Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(ev.jalaliDate, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.ExtraBold)
+                                        val detail = buildString {
+                                            append(ev.periodLabel)
+                                            if (ev.eventTime.isNotBlank()) append(" • ساعت ${toPersianDigits(ev.eventTime)}")
+                                            if (ev.note.isNotBlank()) append(" • ${ev.note}")
+                                        }
+                                        Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Surface(shape = RoundedCornerShape(12.dp), color = stColor) {
+                                        Text(
+                                            text = statusLabelFa(ev.status),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = statusOnColor(ev.status),
+                                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("بستن") }
+            }
         }
     }
 }
@@ -1528,14 +1659,16 @@ private fun MonthlyKpi(title: String, value: String, color: Color) {
 }
 
 @Composable
-private fun MonthlyStudentCard(index: Int, stat: MonthlyStudentStat) {
+private fun MonthlyStudentCard(index: Int, stat: MonthlyStudentStat, onClick: () -> Unit) {
     val pct = (stat.attendancePercent / 100.0).toFloat().coerceIn(0f, 1f)
     val bc = when { stat.attendancePercent >= 90.0 -> StatusColors.Present; stat.attendancePercent >= 75.0 -> StatusColors.Late; else -> StatusColors.Absent }
-    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("${toPersianDigits(index.toString())}. ${stat.firstName} ${stat.lastName}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 Text("${toPersianDigits(String.format(Locale.US, "%.1f", stat.attendancePercent))}٪", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, color = bc)
+                Spacer(Modifier.width(4.dp))
+                Icon(Icons.Rounded.ChevronLeft, "مشاهده تاریخ‌ها", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.height(6.dp))
             LinearProgressIndicator(progress = { pct }, color = bc, modifier = Modifier.fillMaxWidth().height(6.dp))
@@ -1557,7 +1690,6 @@ private fun MonthlyStudentCard(index: Int, stat: MonthlyStudentStat) {
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.provider.ContactsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -1585,6 +1717,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -1625,7 +1758,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ir.hozoor.app.ui.components.ClassCategorySelector
-import ir.hozoor.app.ui.components.ExitTimeWheelDialog
 import ir.hozoor.app.ui.components.ExportAndReportSheet
 import ir.hozoor.app.ui.components.ExpressiveAttendanceToolbar
 import ir.hozoor.app.ui.components.JalaliDatePickerDialog
@@ -1633,6 +1765,7 @@ import ir.hozoor.app.ui.components.PeriodSelector
 import ir.hozoor.app.ui.components.QuickGradeDialog
 import ir.hozoor.app.ui.components.StudentAttendanceCard
 import ir.hozoor.app.ui.components.StudentEditDialog
+import ir.hozoor.app.ui.components.TimeWheelDialog
 import ir.hozoor.app.ui.components.toPersianDigits
 import ir.hozoor.app.ui.state.AttendanceViewModel
 import ir.hozoor.app.ui.theme.StatusColors
@@ -1659,7 +1792,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
     var showTeacherPanel by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
     var editingStudent by remember { mutableStateOf<StudentAttendanceRow?>(null) }
-    var exitingStudent by remember { mutableStateOf<StudentAttendanceRow?>(null) }
+    var timedStatusTarget by remember { mutableStateOf<Pair<StudentAttendanceRow, AttendanceStatus>?>(null) }
     var gradingStudent by remember { mutableStateOf<StudentAttendanceRow?>(null) }
     var deletingStudent by remember { mutableStateOf<StudentAttendanceRow?>(null) }
     var showDeleteClassDialog by remember { mutableStateOf(false) }
@@ -1692,19 +1825,19 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
     }
 
     fun buildStudentNotice(s: StudentAttendanceRow, st: AttendanceStatus): String {
+        val tPart = if (s.eventTime.isNotBlank()) " ساعت ${toPersianDigits(s.eventTime)}" else ""
+        val nPart = if (s.note.isNotBlank()) " (${s.note})" else ""
         val statusText = when (st) {
-            AttendanceStatus.LATE -> "با تأخیر حاضر شده است"
-            AttendanceStatus.LEFT_CLASS -> {
-                val t = if (s.exitTime.isNotBlank()) " ساعت ${toPersianDigits(s.exitTime)}" else ""
-                val r = if (s.note.isNotBlank()) " (${s.note})" else ""
-                "از کلاس خارج شده$t$r"
-            }
+            AttendanceStatus.LATE -> "با تأخیر$tPart$nPart حاضر شده است"
+            AttendanceStatus.LEFT_CLASS -> "از کلاس خارج شده$tPart$nPart"
+            AttendanceStatus.EXCUSED -> "دارای غیبت موجه بوده است"
             else -> "غایب بوده است"
         }
         val pTitle = when (state.selectedPeriod) { Period.FIRST -> "زنگ اول"; Period.SECOND -> "زنگ دوم"; Period.THIRD -> "زنگ سوم"; Period.FOURTH -> "زنگ چهارم" }
         val cls = buildString {
-            append("پایه ${state.selectedGrade} شعبه ${toPersianDigits(state.selectedSection.toString())}")
-            if (state.selectedMajor.isNotBlank()) append(" رشته ${state.selectedMajor}")
+            if (state.selectedMajor.isNotBlank()) append("${state.selectedMajor} - ")
+            append("پایه ${state.selectedGrade}")
+            if (state.sectionsForSelection.size > 1) append(" شعبه ${toPersianDigits(state.selectedSection.toString())}")
         }
         val les = if (state.lessonName.isNotBlank()) "در درس ${state.lessonName} " else ""
         val tch = if (state.teacherName.isNotBlank()) " با دبیر ${state.teacherName}" else ""
@@ -1786,6 +1919,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
                                     onSelectMajor = viewModel::selectMajor, onSelectGrade = viewModel::selectGrade, onSelectSection = viewModel::selectSection,
                                     categories = state.gradeCategories, selectedCategoryId = state.selectedGradeCategoryId,
                                     studentGrades = state.classGrades,
+                                    searchQuery = state.gradebookSearchQuery, onSearchChange = viewModel::updateGradebookSearch,
                                     onSelectCategory = viewModel::selectGradeCategory, onAddCategory = viewModel::addGradeCategory,
                                     onDeleteCategory = viewModel::deleteGradeCategory, onSaveGrade = viewModel::setStudentGrade,
                                     onExportGradebookExcel = { viewModel.exportGradebookExcel { n, b -> FileShareHelper.shareBytesAsFile(context, n, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", b, "اکسل دفتر نمره") } }
@@ -1795,8 +1929,14 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
                                     grades = state.gradesForSelection, selectedGrade = state.selectedGrade,
                                     sections = state.sectionsForSelection, selectedSection = state.selectedSection,
                                     onSelectMajor = viewModel::selectMajor, onSelectGrade = viewModel::selectGrade, onSelectSection = viewModel::selectSection,
-                                    analytics = state.classAnalytics, report = state.monthlyReport, sortByAbsence = state.sortMonthlyByAbsence,
+                                    analytics = state.classAnalytics, report = state.monthlyReport,
+                                    searchQuery = state.monthlySearchQuery, onSearchChange = viewModel::updateMonthlySearch,
+                                    sortByAbsence = state.sortMonthlyByAbsence,
                                     onShiftMonth = viewModel::shiftJalaliMonth, onToggleSort = viewModel::toggleMonthlySort,
+                                    onInspectStudent = viewModel::openStudentMonthlyDetails,
+                                    inspectingStudent = state.inspectingMonthlyStudent,
+                                    inspectingEvents = state.inspectingMonthlyEvents,
+                                    onDismissInspect = viewModel::closeStudentMonthlyDetails,
                                     onExportExcel = { viewModel.exportMonthlyExcel { n, b -> FileShareHelper.shareBytesAsFile(context, n, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", b, "اکسل ماهانه") } },
                                     onExportCsv = { viewModel.exportMonthlyCsv { n, b -> FileShareHelper.shareBytesAsFile(context, n, "text/csv", b, "CSV ماهانه") } },
                                     onRequestDeleteClass = { showDeleteClassDialog = true }
@@ -1812,7 +1952,9 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
                                         OutlinedTextField(
                                             value = state.searchQuery, onValueChange = viewModel::updateSearch,
                                             placeholder = { Text("جستجوی نام، نام خانوادگی، پدر یا کد ملی...") },
-                                            leadingIcon = { Icon(Icons.Rounded.Search, null) }, singleLine = true, shape = RoundedCornerShape(22.dp),
+                                            leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                                            trailingIcon = { if (state.searchQuery.isNotEmpty()) IconButton(onClick = { viewModel.updateSearch("") }) { Icon(Icons.Rounded.Close, "پاک") } },
+                                            singleLine = true, shape = RoundedCornerShape(22.dp),
                                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
                                         )
                                     }
@@ -1820,7 +1962,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
                                         StudentAttendanceCard(
                                             indexInClass = idx + 1, student = stu, selectedPeriod = state.selectedPeriod,
                                             onStatusChange = { viewModel.setStudentStatus(stu.studentId, it) },
-                                            onRequestLeftClass = { exitingStudent = stu },
+                                            onRequestTimedStatus = { st -> timedStatusTarget = stu to st },
                                             onSendIndividualNotice = { s, st ->
                                                 val phone = state.principalPhone.ifBlank { s.mobile }
                                                 FileShareHelper.openSmsApp(context, phone, buildStudentNotice(s, st))
@@ -1856,23 +1998,16 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
         val ym = remember(state.selectedDate) { viewModel.currentDateJalaliYearMonth() }
         JalaliDatePickerDialog(ym.year, ym.month, state.selectedDate.toString(), viewModel::getJalaliCalendarGrid, viewModel::selectDateIso) { showDatePicker = false }
     }
-    exitingStudent?.let { stu ->
-        ExitTimeWheelDialog(
+    timedStatusTarget?.let { (stu, targetStatus) ->
+        TimeWheelDialog(
             student = stu,
-            onConfirm = { time, reason -> viewModel.setStudentStatus(stu.studentId, AttendanceStatus.LEFT_CLASS, time, reason) },
-            onDismiss = { exitingStudent = null }
+            targetStatus = targetStatus,
+            onConfirm = { time, reason -> viewModel.setStudentStatus(stu.studentId, targetStatus, time, reason) },
+            onDismiss = { timedStatusTarget = null }
         )
     }
     gradingStudent?.let { stu ->
-        QuickGradeDialog(
-            studentName = "${stu.firstName} ${stu.lastName}",
-            categories = state.gradeCategories,
-            initialCategoryId = state.selectedGradeCategoryId,
-            initialScore = stu.latestGrade,
-            initialNote = "",
-            onSave = { cid, sc, nt -> viewModel.setStudentGrade(stu.studentId, cid, sc, nt) },
-            onDismiss = { gradingStudent = null }
-        )
+        QuickGradeDialog("${stu.firstName} ${stu.lastName}", state.gradeCategories, state.selectedGradeCategoryId, stu.latestGrade, "", { cid, sc, nt -> viewModel.setStudentGrade(stu.studentId, cid, sc, nt) }) { gradingStudent = null }
     }
     if (showAddDialog) StudentEditDialog(null, { f, l, fa, nid, mob -> viewModel.addStudentToCurrentClass(f, l, fa, nid, mob) }) { showAddDialog = false }
     editingStudent?.let { st -> StudentEditDialog(st, { f, l, fa, nid, mob -> viewModel.updateStudent(st.studentId, f, l, fa, nid, mob) }) { editingStudent = null } }
@@ -1906,7 +2041,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
             feedbackMessage = state.sheetFeedback,
             onToggleWholeSchool = { viewModel.prepareExportSheet(it) },
             onRecipientPhoneChange = viewModel::updatePrincipalPhone,
-            onPickPhoneContact = { contactPicker.launch(Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI)) },
+            onPickPhoneContact = { contactPicker.launch(FileShareHelper.createPickPhoneContactIntent(context)) },
             onSelectSavedContact = { c -> viewModel.updateRecipient(c.name, c.phone) },
             onSaveCurrentContact = { n, p -> viewModel.saveContact(n, "", p) },
             onDeleteSavedContact = viewModel::deleteContact,
@@ -1936,7 +2071,7 @@ private fun SummaryHeaderCard(summary: PeriodSummary) {
             MetricPill("حاضر", summary.present, StatusColors.Present)
             MetricPill("غایب", summary.absent, StatusColors.Absent)
             MetricPill("تأخیر", summary.late, StatusColors.Late)
-            MetricPill("موجه", summary.excused, StatusColors.Excused)
+            MetricPill("غیبت موجه", summary.excused, StatusColors.Excused)
             MetricPill("خروج", summary.leftClass, StatusColors.LeftClass)
         }
     }
@@ -1976,7 +2111,7 @@ def main():
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(content, encoding="utf-8", newline="\n")
         print(f"Created: {rel}")
-    print(f"\nPart 3 (Android Screens & Components v4.0) done: {len(FILES)} files.")
+    print(f"\nPart 3 (Android Screens v5.0) done: {len(FILES)} files.")
 
 
 if __name__ == "__main__":

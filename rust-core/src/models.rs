@@ -18,6 +18,9 @@ impl Period {
     pub fn to_i32(self) -> i32 {
         match self { Period::First => 1, Period::Second => 2, Period::Third => 3, Period::Fourth => 4 }
     }
+    pub fn from_i32(v: i32) -> Self {
+        match v { 2 => Period::Second, 3 => Period::Third, 4 => Period::Fourth, _ => Period::First }
+    }
     pub fn previous(self) -> Option<Period> {
         match self { Period::First => None, Period::Second => Some(Period::First), Period::Third => Some(Period::Second), Period::Fourth => Some(Period::Third) }
     }
@@ -47,7 +50,7 @@ impl AttendanceStatus {
             AttendanceStatus::Unmarked | AttendanceStatus::Present => "حاضر",
             AttendanceStatus::Absent => "غایب",
             AttendanceStatus::Late => "تأخیر",
-            AttendanceStatus::Excused => "موجه",
+            AttendanceStatus::Excused => "غیبت موجه",
             AttendanceStatus::LeftClass => "خروج از کلاس",
         }
     }
@@ -61,7 +64,7 @@ pub struct StudentAttendanceRow {
     pub student_id: i64, pub row_num: i32, pub first_name: String, pub last_name: String,
     pub father_name: String, pub national_id: String, pub mobile: String,
     pub current_status: AttendanceStatus, pub period_statuses: Vec<AttendanceStatus>,
-    pub exit_time: String, pub note: String, pub latest_grade: String,
+    pub event_time: String, pub note: String, pub latest_grade: String,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -83,10 +86,7 @@ pub struct PrincipalReportBundle {
 pub struct GradeCategory { pub id: i64, pub name: String }
 
 #[derive(Debug, Clone, uniffi::Record)]
-pub struct StudentGradeRow {
-    pub student_id: i64, pub first_name: String, pub last_name: String,
-    pub father_name: String, pub score: String, pub note: String,
-}
+pub struct StudentGradeRow { pub student_id: i64, pub first_name: String, pub last_name: String, pub father_name: String, pub score: String, pub note: String }
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct SavedContact { pub id: i64, pub name: String, pub role: String, pub phone: String }
@@ -103,6 +103,16 @@ pub struct ClassAnalytics {
     pub total_late: i32, pub total_excused: i32, pub total_left_class: i32,
     pub top_absent: Vec<TopStudentCount>, pub top_late: Vec<TopStudentCount>,
     pub top_excused: Vec<TopStudentCount>, pub top_left_class: Vec<TopStudentCount>,
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct StudentMonthlyEvent {
+    pub date_iso: String,
+    pub jalali_date: String,
+    pub period_label: String,
+    pub status: AttendanceStatus,
+    pub event_time: String,
+    pub note: String,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]

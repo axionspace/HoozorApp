@@ -3,7 +3,6 @@ package ir.hozoor.app.ui.screens
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.provider.ContactsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -31,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -71,7 +71,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ir.hozoor.app.ui.components.ClassCategorySelector
-import ir.hozoor.app.ui.components.ExitTimeWheelDialog
 import ir.hozoor.app.ui.components.ExportAndReportSheet
 import ir.hozoor.app.ui.components.ExpressiveAttendanceToolbar
 import ir.hozoor.app.ui.components.JalaliDatePickerDialog
@@ -79,6 +78,7 @@ import ir.hozoor.app.ui.components.PeriodSelector
 import ir.hozoor.app.ui.components.QuickGradeDialog
 import ir.hozoor.app.ui.components.StudentAttendanceCard
 import ir.hozoor.app.ui.components.StudentEditDialog
+import ir.hozoor.app.ui.components.TimeWheelDialog
 import ir.hozoor.app.ui.components.toPersianDigits
 import ir.hozoor.app.ui.state.AttendanceViewModel
 import ir.hozoor.app.ui.theme.StatusColors
@@ -105,7 +105,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
     var showTeacherPanel by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
     var editingStudent by remember { mutableStateOf<StudentAttendanceRow?>(null) }
-    var exitingStudent by remember { mutableStateOf<StudentAttendanceRow?>(null) }
+    var timedStatusTarget by remember { mutableStateOf<Pair<StudentAttendanceRow, AttendanceStatus>?>(null) }
     var gradingStudent by remember { mutableStateOf<StudentAttendanceRow?>(null) }
     var deletingStudent by remember { mutableStateOf<StudentAttendanceRow?>(null) }
     var showDeleteClassDialog by remember { mutableStateOf(false) }
@@ -138,19 +138,19 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
     }
 
     fun buildStudentNotice(s: StudentAttendanceRow, st: AttendanceStatus): String {
+        val tPart = if (s.eventTime.isNotBlank()) " ساعت ${toPersianDigits(s.eventTime)}" else ""
+        val nPart = if (s.note.isNotBlank()) " (${s.note})" else ""
         val statusText = when (st) {
-            AttendanceStatus.LATE -> "با تأخیر حاضر شده است"
-            AttendanceStatus.LEFT_CLASS -> {
-                val t = if (s.exitTime.isNotBlank()) " ساعت ${toPersianDigits(s.exitTime)}" else ""
-                val r = if (s.note.isNotBlank()) " (${s.note})" else ""
-                "از کلاس خارج شده$t$r"
-            }
+            AttendanceStatus.LATE -> "با تأخیر$tPart$nPart حاضر شده است"
+            AttendanceStatus.LEFT_CLASS -> "از کلاس خارج شده$tPart$nPart"
+            AttendanceStatus.EXCUSED -> "دارای غیبت موجه بوده است"
             else -> "غایب بوده است"
         }
         val pTitle = when (state.selectedPeriod) { Period.FIRST -> "زنگ اول"; Period.SECOND -> "زنگ دوم"; Period.THIRD -> "زنگ سوم"; Period.FOURTH -> "زنگ چهارم" }
         val cls = buildString {
-            append("پایه ${state.selectedGrade} شعبه ${toPersianDigits(state.selectedSection.toString())}")
-            if (state.selectedMajor.isNotBlank()) append(" رشته ${state.selectedMajor}")
+            if (state.selectedMajor.isNotBlank()) append("${state.selectedMajor} - ")
+            append("پایه ${state.selectedGrade}")
+            if (state.sectionsForSelection.size > 1) append(" شعبه ${toPersianDigits(state.selectedSection.toString())}")
         }
         val les = if (state.lessonName.isNotBlank()) "در درس ${state.lessonName} " else ""
         val tch = if (state.teacherName.isNotBlank()) " با دبیر ${state.teacherName}" else ""
@@ -232,6 +232,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
                                     onSelectMajor = viewModel::selectMajor, onSelectGrade = viewModel::selectGrade, onSelectSection = viewModel::selectSection,
                                     categories = state.gradeCategories, selectedCategoryId = state.selectedGradeCategoryId,
                                     studentGrades = state.classGrades,
+                                    searchQuery = state.gradebookSearchQuery, onSearchChange = viewModel::updateGradebookSearch,
                                     onSelectCategory = viewModel::selectGradeCategory, onAddCategory = viewModel::addGradeCategory,
                                     onDeleteCategory = viewModel::deleteGradeCategory, onSaveGrade = viewModel::setStudentGrade,
                                     onExportGradebookExcel = { viewModel.exportGradebookExcel { n, b -> FileShareHelper.shareBytesAsFile(context, n, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", b, "اکسل دفتر نمره") } }
@@ -241,8 +242,14 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
                                     grades = state.gradesForSelection, selectedGrade = state.selectedGrade,
                                     sections = state.sectionsForSelection, selectedSection = state.selectedSection,
                                     onSelectMajor = viewModel::selectMajor, onSelectGrade = viewModel::selectGrade, onSelectSection = viewModel::selectSection,
-                                    analytics = state.classAnalytics, report = state.monthlyReport, sortByAbsence = state.sortMonthlyByAbsence,
+                                    analytics = state.classAnalytics, report = state.monthlyReport,
+                                    searchQuery = state.monthlySearchQuery, onSearchChange = viewModel::updateMonthlySearch,
+                                    sortByAbsence = state.sortMonthlyByAbsence,
                                     onShiftMonth = viewModel::shiftJalaliMonth, onToggleSort = viewModel::toggleMonthlySort,
+                                    onInspectStudent = viewModel::openStudentMonthlyDetails,
+                                    inspectingStudent = state.inspectingMonthlyStudent,
+                                    inspectingEvents = state.inspectingMonthlyEvents,
+                                    onDismissInspect = viewModel::closeStudentMonthlyDetails,
                                     onExportExcel = { viewModel.exportMonthlyExcel { n, b -> FileShareHelper.shareBytesAsFile(context, n, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", b, "اکسل ماهانه") } },
                                     onExportCsv = { viewModel.exportMonthlyCsv { n, b -> FileShareHelper.shareBytesAsFile(context, n, "text/csv", b, "CSV ماهانه") } },
                                     onRequestDeleteClass = { showDeleteClassDialog = true }
@@ -258,7 +265,9 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
                                         OutlinedTextField(
                                             value = state.searchQuery, onValueChange = viewModel::updateSearch,
                                             placeholder = { Text("جستجوی نام، نام خانوادگی، پدر یا کد ملی...") },
-                                            leadingIcon = { Icon(Icons.Rounded.Search, null) }, singleLine = true, shape = RoundedCornerShape(22.dp),
+                                            leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                                            trailingIcon = { if (state.searchQuery.isNotEmpty()) IconButton(onClick = { viewModel.updateSearch("") }) { Icon(Icons.Rounded.Close, "پاک") } },
+                                            singleLine = true, shape = RoundedCornerShape(22.dp),
                                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
                                         )
                                     }
@@ -266,7 +275,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
                                         StudentAttendanceCard(
                                             indexInClass = idx + 1, student = stu, selectedPeriod = state.selectedPeriod,
                                             onStatusChange = { viewModel.setStudentStatus(stu.studentId, it) },
-                                            onRequestLeftClass = { exitingStudent = stu },
+                                            onRequestTimedStatus = { st -> timedStatusTarget = stu to st },
                                             onSendIndividualNotice = { s, st ->
                                                 val phone = state.principalPhone.ifBlank { s.mobile }
                                                 FileShareHelper.openSmsApp(context, phone, buildStudentNotice(s, st))
@@ -302,23 +311,16 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
         val ym = remember(state.selectedDate) { viewModel.currentDateJalaliYearMonth() }
         JalaliDatePickerDialog(ym.year, ym.month, state.selectedDate.toString(), viewModel::getJalaliCalendarGrid, viewModel::selectDateIso) { showDatePicker = false }
     }
-    exitingStudent?.let { stu ->
-        ExitTimeWheelDialog(
+    timedStatusTarget?.let { (stu, targetStatus) ->
+        TimeWheelDialog(
             student = stu,
-            onConfirm = { time, reason -> viewModel.setStudentStatus(stu.studentId, AttendanceStatus.LEFT_CLASS, time, reason) },
-            onDismiss = { exitingStudent = null }
+            targetStatus = targetStatus,
+            onConfirm = { time, reason -> viewModel.setStudentStatus(stu.studentId, targetStatus, time, reason) },
+            onDismiss = { timedStatusTarget = null }
         )
     }
     gradingStudent?.let { stu ->
-        QuickGradeDialog(
-            studentName = "${stu.firstName} ${stu.lastName}",
-            categories = state.gradeCategories,
-            initialCategoryId = state.selectedGradeCategoryId,
-            initialScore = stu.latestGrade,
-            initialNote = "",
-            onSave = { cid, sc, nt -> viewModel.setStudentGrade(stu.studentId, cid, sc, nt) },
-            onDismiss = { gradingStudent = null }
-        )
+        QuickGradeDialog("${stu.firstName} ${stu.lastName}", state.gradeCategories, state.selectedGradeCategoryId, stu.latestGrade, "", { cid, sc, nt -> viewModel.setStudentGrade(stu.studentId, cid, sc, nt) }) { gradingStudent = null }
     }
     if (showAddDialog) StudentEditDialog(null, { f, l, fa, nid, mob -> viewModel.addStudentToCurrentClass(f, l, fa, nid, mob) }) { showAddDialog = false }
     editingStudent?.let { st -> StudentEditDialog(st, { f, l, fa, nid, mob -> viewModel.updateStudent(st.studentId, f, l, fa, nid, mob) }) { editingStudent = null } }
@@ -352,7 +354,7 @@ fun AttendanceScreen(viewModel: AttendanceViewModel, isDarkTheme: Boolean) {
             feedbackMessage = state.sheetFeedback,
             onToggleWholeSchool = { viewModel.prepareExportSheet(it) },
             onRecipientPhoneChange = viewModel::updatePrincipalPhone,
-            onPickPhoneContact = { contactPicker.launch(Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI)) },
+            onPickPhoneContact = { contactPicker.launch(FileShareHelper.createPickPhoneContactIntent(context)) },
             onSelectSavedContact = { c -> viewModel.updateRecipient(c.name, c.phone) },
             onSaveCurrentContact = { n, p -> viewModel.saveContact(n, "", p) },
             onDeleteSavedContact = viewModel::deleteContact,
@@ -382,7 +384,7 @@ private fun SummaryHeaderCard(summary: PeriodSummary) {
             MetricPill("حاضر", summary.present, StatusColors.Present)
             MetricPill("غایب", summary.absent, StatusColors.Absent)
             MetricPill("تأخیر", summary.late, StatusColors.Late)
-            MetricPill("موجه", summary.excused, StatusColors.Excused)
+            MetricPill("غیبت موجه", summary.excused, StatusColors.Excused)
             MetricPill("خروج", summary.leftClass, StatusColors.LeftClass)
         }
     }

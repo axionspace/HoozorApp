@@ -3,7 +3,7 @@ from pathlib import Path
 FILES = {
     "rust-core/Cargo.toml": r'''[package]
 name = "hozoor_core"
-version = "4.0.0"
+version = "5.0.0"
 edition = "2021"
 
 [lib]
@@ -53,6 +53,9 @@ impl Period {
     pub fn to_i32(self) -> i32 {
         match self { Period::First => 1, Period::Second => 2, Period::Third => 3, Period::Fourth => 4 }
     }
+    pub fn from_i32(v: i32) -> Self {
+        match v { 2 => Period::Second, 3 => Period::Third, 4 => Period::Fourth, _ => Period::First }
+    }
     pub fn previous(self) -> Option<Period> {
         match self { Period::First => None, Period::Second => Some(Period::First), Period::Third => Some(Period::Second), Period::Fourth => Some(Period::Third) }
     }
@@ -82,7 +85,7 @@ impl AttendanceStatus {
             AttendanceStatus::Unmarked | AttendanceStatus::Present => "حاضر",
             AttendanceStatus::Absent => "غایب",
             AttendanceStatus::Late => "تأخیر",
-            AttendanceStatus::Excused => "موجه",
+            AttendanceStatus::Excused => "غیبت موجه",
             AttendanceStatus::LeftClass => "خروج از کلاس",
         }
     }
@@ -96,7 +99,7 @@ pub struct StudentAttendanceRow {
     pub student_id: i64, pub row_num: i32, pub first_name: String, pub last_name: String,
     pub father_name: String, pub national_id: String, pub mobile: String,
     pub current_status: AttendanceStatus, pub period_statuses: Vec<AttendanceStatus>,
-    pub exit_time: String, pub note: String, pub latest_grade: String,
+    pub event_time: String, pub note: String, pub latest_grade: String,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -118,10 +121,7 @@ pub struct PrincipalReportBundle {
 pub struct GradeCategory { pub id: i64, pub name: String }
 
 #[derive(Debug, Clone, uniffi::Record)]
-pub struct StudentGradeRow {
-    pub student_id: i64, pub first_name: String, pub last_name: String,
-    pub father_name: String, pub score: String, pub note: String,
-}
+pub struct StudentGradeRow { pub student_id: i64, pub first_name: String, pub last_name: String, pub father_name: String, pub score: String, pub note: String }
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct SavedContact { pub id: i64, pub name: String, pub role: String, pub phone: String }
@@ -138,6 +138,16 @@ pub struct ClassAnalytics {
     pub total_late: i32, pub total_excused: i32, pub total_left_class: i32,
     pub top_absent: Vec<TopStudentCount>, pub top_late: Vec<TopStudentCount>,
     pub top_excused: Vec<TopStudentCount>, pub top_left_class: Vec<TopStudentCount>,
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct StudentMonthlyEvent {
+    pub date_iso: String,
+    pub jalali_date: String,
+    pub period_label: String,
+    pub status: AttendanceStatus,
+    pub event_time: String,
+    pub note: String,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -419,7 +429,7 @@ fn parse_csv(line: &str, delim: char) -> Vec<String> {
     "rust-core/src/db.rs": r'''use crate::models::{
     AttendanceStatus, BackupStats, ClassAnalytics, ClassAttendanceSnapshot, ClassGroup, CoreError,
     GradeCategory, ImportReport, MonthlyClassReport, MonthlyStudentStat, Period, PeriodSummary,
-    SavedContact, StudentAttendanceRow, StudentGradeRow, TopStudentCount,
+    SavedContact, StudentAttendanceRow, StudentGradeRow, StudentMonthlyEvent, TopStudentCount,
 };
 use crate::persian::{
     format_iso_to_jalali, format_jalali_month_label, grade_rank, is_middle_grade,
@@ -463,9 +473,7 @@ pub fn init_database(db_path: &str) -> Result<Connection, CoreError> {
          );
 
          CREATE TABLE IF NOT EXISTS grade_categories (
-             id INTEGER PRIMARY KEY AUTOINCREMENT,
-             name TEXT NOT NULL UNIQUE,
-             sort_order INTEGER NOT NULL DEFAULT 0
+             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, sort_order INTEGER NOT NULL DEFAULT 0
          );
 
          CREATE TABLE IF NOT EXISTS student_grades (
@@ -477,8 +485,7 @@ pub fn init_database(db_path: &str) -> Result<Connection, CoreError> {
          );
 
          CREATE TABLE IF NOT EXISTS saved_contacts (
-             id INTEGER PRIMARY KEY AUTOINCREMENT,
-             name TEXT NOT NULL, role TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL UNIQUE
+             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL UNIQUE
          );
 
          CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -549,7 +556,7 @@ pub fn get_class_attendance(conn: &Connection, major: &str, grade: &str, section
         Ok(StudentAttendanceRow {
             student_id: r.get(0)?, row_num: r.get(1)?, first_name: r.get(2)?, last_name: r.get(3)?,
             father_name: r.get(4)?, national_id: r.get(5)?, mobile: r.get(6)?,
-            current_status: cur, period_statuses: sts, exit_time: r.get(11)?, note: r.get(12)?, latest_grade: r.get(13)?,
+            current_status: cur, period_statuses: sts, event_time: r.get(11)?, note: r.get(12)?, latest_grade: r.get(13)?,
         })
     }).map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
 
@@ -569,11 +576,12 @@ pub fn get_class_attendance(conn: &Connection, major: &str, grade: &str, section
     Ok(ClassAttendanceSnapshot { jalali_date: format_iso_to_jalali(date_iso), is_period_saved: saved, summary: sum, students })
 }
 
-pub fn set_attendance(conn: &mut Connection, student_id: i64, date_iso: &str, period: Period, status: AttendanceStatus, exit_time: &str, note: &str, teacher: &str, lesson: &str, class_time: &str) -> Result<(), CoreError> {
+/// ذخیره ساعت هم برای «تأخیر» و هم برای «خروج از کلاس»
+pub fn set_attendance(conn: &mut Connection, student_id: i64, date_iso: &str, period: Period, status: AttendanceStatus, event_time: &str, note: &str, teacher: &str, lesson: &str, class_time: &str) -> Result<(), CoreError> {
     let tx = conn.transaction().map_err(|e| CoreError::Database(e.to_string()))?;
     let now = now_unix();
     let pn = period.to_i32();
-    let clean_exit = if status == AttendanceStatus::LeftClass { exit_time.trim() } else { "" };
+    let clean_time = if matches!(status, AttendanceStatus::LeftClass | AttendanceStatus::Late) { event_time.trim() } else { "" };
 
     tx.execute(
         "INSERT OR IGNORE INTO attendance (student_id, date_iso, period, status, exit_time, note, teacher_name, lesson_name, class_time, updated_at)
@@ -589,7 +597,7 @@ pub fn set_attendance(conn: &mut Connection, student_id: i64, date_iso: &str, pe
          ON CONFLICT(student_id, date_iso, period) DO UPDATE SET
              status=excluded.status, exit_time=excluded.exit_time, note=excluded.note,
              teacher_name=excluded.teacher_name, lesson_name=excluded.lesson_name, class_time=excluded.class_time, updated_at=excluded.updated_at",
-        params![student_id, date_iso, pn, status.to_i32(), clean_exit, note.trim(), teacher.trim(), lesson.trim(), class_time.trim(), now],
+        params![student_id, date_iso, pn, status.to_i32(), clean_time, note.trim(), teacher.trim(), lesson.trim(), class_time.trim(), now],
     ).map_err(|e| CoreError::Database(e.to_string()))?;
     tx.commit().map_err(|e| CoreError::Database(e.to_string()))?;
     Ok(())
@@ -656,7 +664,6 @@ pub fn delete_class(conn: &Connection, major: &str, grade: &str, section: i32) -
     Ok(d as i32)
 }
 
-// ===== دفتر نمره (مستمر ماهانه / پودمانی / دلخواه) =====
 pub fn get_grade_categories(conn: &Connection) -> Result<Vec<GradeCategory>, CoreError> {
     let mut st = conn.prepare_cached("SELECT id, name FROM grade_categories ORDER BY sort_order ASC, id ASC").map_err(|e| CoreError::Database(e.to_string()))?;
     let rows = st.query_map([], |r| Ok(GradeCategory { id: r.get(0)?, name: r.get(1)? }))
@@ -669,7 +676,7 @@ pub fn add_grade_category(conn: &Connection, name: &str) -> Result<i64, CoreErro
     if n.is_empty() { return Err(CoreError::InvalidInput("عنوان نمره را وارد کنید".into())); }
     let next_order: i32 = conn.query_row("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM grade_categories", [], |r| r.get(0)).unwrap_or(10);
     conn.execute("INSERT INTO grade_categories (name, sort_order) VALUES (?1, ?2)", params![n, next_order])
-        .map_err(|e| if e.to_string().contains("UNIQUE") { CoreError::InvalidInput("این عنوان نمره قبلاً وجود دارد".into()) } else { CoreError::Database(e.to_string()) })?;
+        .map_err(|e| if e.to_string().contains("UNIQUE") { CoreError::InvalidInput("این عنوان قبلاً وجود دارد".into()) } else { CoreError::Database(e.to_string()) })?;
     Ok(conn.last_insert_rowid())
 }
 
@@ -700,7 +707,6 @@ pub fn set_student_grade(conn: &Connection, student_id: i64, category_id: i64, s
     Ok(())
 }
 
-// ===== مخاطبین ذخیره‌شده (مدیر، معاون، مشاور...) =====
 pub fn get_saved_contacts(conn: &Connection) -> Result<Vec<SavedContact>, CoreError> {
     let mut st = conn.prepare_cached("SELECT id, name, role, phone FROM saved_contacts ORDER BY id ASC").map_err(|e| CoreError::Database(e.to_string()))?;
     let rows = st.query_map([], |r| Ok(SavedContact { id: r.get(0)?, name: r.get(1)?, role: r.get(2)?, phone: r.get(3)? }))
@@ -722,7 +728,6 @@ pub fn delete_contact(conn: &Connection, id: i64) -> Result<(), CoreError> {
     Ok(())
 }
 
-// ===== آمار و گزارش ماهانه =====
 pub fn get_backup_stats(conn: &Connection) -> Result<BackupStats, CoreError> {
     Ok(BackupStats {
         students_count: conn.query_row("SELECT COUNT(*) FROM students", [], |r| r.get(0)).unwrap_or(0),
@@ -761,6 +766,32 @@ pub fn get_class_analytics(conn: &Connection, major: &str, grade: &str, section:
         v.truncate(8); v
     };
     Ok(ClassAnalytics { student_count: names.len() as i32, recorded_sessions: sessions.len() as i32, total_absent: ta, total_late: tl, total_excused: te, total_left_class: tlc, top_absent: rank(ma), top_late: rank(ml), top_excused: rank(me), top_left_class: rank(mlc) })
+}
+
+/// جزئیات تاریخ‌به‌تاریخ غیبت‌ها، تأخیرها، غیبت‌های موجه و خروج‌های یک دانش‌آموز در یک ماه شمسی
+pub fn get_student_monthly_details(conn: &Connection, student_id: i64, jy: i32, jm_i: i32) -> Result<Vec<StudentMonthlyEvent>, CoreError> {
+    let jm = jm_i.clamp(1, 12) as u32;
+    let (s_iso, e_iso) = jalali_month_range_iso(jy, jm);
+    let mut st = conn.prepare_cached(
+        "SELECT date_iso, period, status, exit_time, note
+         FROM attendance
+         WHERE student_id=?1 AND date_iso>=?2 AND date_iso<=?3 AND status IN (2,3,4,5)
+         ORDER BY date_iso DESC, period ASC",
+    ).map_err(|e| CoreError::Database(e.to_string()))?;
+
+    st.query_map(params![student_id, s_iso, e_iso], |r| {
+        let date_iso: String = r.get(0)?;
+        let period = Period::from_i32(r.get(1)?);
+        let status = AttendanceStatus::from_i32(r.get(2)?);
+        Ok(StudentMonthlyEvent {
+            jalali_date: format_iso_to_jalali(&date_iso),
+            date_iso,
+            period_label: period.label_fa().to_string(),
+            status,
+            event_time: r.get(3)?,
+            note: r.get(4)?,
+        })
+    }).map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))
 }
 
 pub fn get_monthly_report(conn: &Connection, major: &str, grade: &str, section: i32, jy: i32, jm_i: i32) -> Result<MonthlyClassReport, CoreError> {
@@ -810,7 +841,6 @@ pub fn get_monthly_report(conn: &Connection, major: &str, grade: &str, section: 
     })
 }
 
-// ===== پشتیبان کلی JSON (دانش‌آموزان + حضور + خروج + نمرات مستمر/پودمانی + مخاطبین + تنظیمات) =====
 #[derive(Serialize, Deserialize)]
 struct BkPayload {
     version: i32, students: Vec<BkStu>, attendance: Vec<BkAtt>,
@@ -853,7 +883,7 @@ pub fn export_backup_json(conn: &Connection) -> Result<String, CoreError> {
         let (k, v) = r.map_err(|e| CoreError::Database(e.to_string()))?;
         settings.insert(k, v);
     }
-    serde_json::to_string_pretty(&BkPayload { version: 4, students, attendance, grade_categories, grades, contacts, settings }).map_err(|e| CoreError::Import(e.to_string()))
+    serde_json::to_string_pretty(&BkPayload { version: 5, students, attendance, grade_categories, grades, contacts, settings }).map_err(|e| CoreError::Import(e.to_string()))
 }
 
 pub fn restore_backup_json(conn: &mut Connection, json_text: &str) -> Result<ImportReport, CoreError> {
@@ -914,13 +944,37 @@ use std::collections::{HashMap, HashSet};
 const P_FULL: [&str; 4] = ["زنگ اول", "زنگ دوم", "زنگ سوم", "زنگ چهارم"];
 const P_SMS: [&str; 4] = ["زنگ ۱", "زنگ ۲", "زنگ ۳", "زنگ ۴"];
 
-fn cls_title(major: &str, grade: &str, sec: i32) -> String {
+/// اگر کلاس در رشته و پایه خودش فقط ۱ شعبه داشته باشد، عبارت «شعبه» حذف می‌شود
+fn cls_title(major: &str, grade: &str, sec: i32, show_section: bool) -> String {
     let s = to_persian_digits(&sec.to_string());
-    if major.trim().is_empty() { format!("پایه {grade} شعبه {s}") } else { format!("{major} - {grade} شعبه {s}") }
+    match (major.trim().is_empty(), show_section) {
+        (true, true) => format!("پایه {grade} شعبه {s}"),
+        (true, false) => format!("پایه {grade}"),
+        (false, true) => format!("{major} - {grade} شعبه {s}"),
+        (false, false) => format!("{major} - {grade}"),
+    }
 }
 
-fn exit_suffix(exit_time: &str, note: &str) -> String {
-    let t = to_persian_digits(exit_time);
+fn build_multi_section_map(all: &[ClassGroup]) -> HashMap<(String, String), bool> {
+    let mut sets: HashMap<(String, String), HashSet<i32>> = HashMap::new();
+    for c in all {
+        sets.entry((c.major.clone(), c.grade.clone())).or_default().insert(c.section);
+    }
+    sets.into_iter().map(|(k, v)| (k, v.len() > 1)).collect()
+}
+
+fn late_suffix(time: &str, note: &str) -> String {
+    let t = to_persian_digits(time);
+    match (t.is_empty(), note.trim().is_empty()) {
+        (true, true) => "تأخیر".into(),
+        (false, true) => format!("تأخیر ساعت {t}"),
+        (true, false) => format!("تأخیر - {}", note.trim()),
+        (false, false) => format!("تأخیر ساعت {t} - {}", note.trim()),
+    }
+}
+
+fn exit_suffix(time: &str, note: &str) -> String {
+    let t = to_persian_digits(time);
     match (t.is_empty(), note.trim().is_empty()) {
         (true, true) => "خروج از کلاس".into(),
         (false, true) => format!("خروج ساعت {t}"),
@@ -930,7 +984,9 @@ fn exit_suffix(exit_time: &str, note: &str) -> String {
 }
 
 pub fn generate_period_group_message(conn: &Connection, major: &str, grade: &str, section: i32, date_iso: &str, period: Period, target: AttendanceStatus, teacher: &str, lesson: &str, whole: bool) -> Result<String, CoreError> {
-    let classes: Vec<ClassGroup> = if whole { db::get_classes(conn)? } else { db::get_classes(conn)?.into_iter().filter(|c| c.major == major && c.grade == grade && c.section == section).collect() };
+    let all = db::get_classes(conn)?;
+    let multi = build_multi_section_map(&all);
+    let classes: Vec<ClassGroup> = if whole { all } else { all.into_iter().filter(|c| c.major == major && c.grade == grade && c.section == section).collect() };
     if classes.is_empty() { return Err(CoreError::InvalidInput("هیچ کلاسی یافت نشد".into())); }
 
     let (action, empty_w) = match target {
@@ -948,21 +1004,23 @@ pub fn generate_period_group_message(conn: &Connection, major: &str, grade: &str
         let snap = db::get_class_attendance(conn, &cls.major, &cls.grade, cls.section, date_iso, period, "")?;
         let m: Vec<_> = snap.students.into_iter().filter(|s| s.current_status == target).collect();
         if m.is_empty() { continue; }
-        if whole { body.push_str(&format!("\n[{}]\n", cls_title(&cls.major, &cls.grade, cls.section))); }
+        let show_sec = *multi.get(&(cls.major.clone(), cls.grade.clone())).unwrap_or(&false);
+        if whole { body.push_str(&format!("\n[{}]\n", cls_title(&cls.major, &cls.grade, cls.section, show_sec))); }
         for (i, s) in m.iter().enumerate() {
             cnt += 1;
             let num = to_persian_digits(&(i + 1).to_string());
             let fa = if s.father_name.is_empty() { "ثبت نشده" } else { &s.father_name };
             let tag = match target {
-                AttendanceStatus::Late => "تأخیر".into(),
-                AttendanceStatus::LeftClass => exit_suffix(&s.exit_time, &s.note),
+                AttendanceStatus::Late => late_suffix(&s.event_time, &s.note),
+                AttendanceStatus::LeftClass => exit_suffix(&s.event_time, &s.note),
                 _ => "غایب".into(),
             };
             body.push_str(&format!("{num}. {} {}، فرزند {fa} ({tag})\n", s.first_name, s.last_name));
         }
     }
     if cnt == 0 { return Err(CoreError::InvalidInput(format!("در {} هیچ دانش‌آموز {empty_w} ثبت نشده است", period.label_fa()))); }
-    let scope = if whole { format!("کل {school}") } else { cls_title(major, grade, section) };
+    let show_sec_cur = *multi.get(&(major.to_string(), grade.to_string())).unwrap_or(&false);
+    let scope = if whole { format!("کل {school}") } else { cls_title(major, grade, section, show_sec_cur) };
     let mut msg = format!("سلام علیکم\nمدیریت محترم {school}،\nدانش‌آموزان زیر {lp}{scope}، {} مورخه {jalali} {action}:\n\n{}", period.label_fa(), body.trim());
     if !teacher.trim().is_empty() { msg.push_str(&format!("\n\nبا تشکر\n{}", teacher.trim())); }
     Ok(msg)
@@ -970,6 +1028,7 @@ pub fn generate_period_group_message(conn: &Connection, major: &str, grade: &str
 
 pub fn generate_principal_report(conn: &Connection, major: Option<&str>, grade: Option<&str>, section: Option<i32>, date_iso: &str, teacher: &str) -> Result<PrincipalReportBundle, CoreError> {
     let all = db::get_classes(conn)?;
+    let multi = build_multi_section_map(&all);
     let classes: Vec<ClassGroup> = match (major, grade, section) {
         (Some(m), Some(g), Some(sec)) => all.into_iter().filter(|c| c.major == m && c.grade == g && c.section == sec).collect(),
         _ => all,
@@ -984,7 +1043,9 @@ pub fn generate_principal_report(conn: &Connection, major: Option<&str>, grade: 
     let mut full = format!("📋 گزارش حضور و غیاب {school}\n📅 تاریخ: {jf}\n");
     if !teacher.trim().is_empty() { full.push_str(&format!("👤 دبیر: {}\n", teacher.trim())); }
     let mut sms = if is_whole { format!("گزارش {school} ({js})\n") } else {
-        let t = cls_title(&classes[0].major, &classes[0].grade, classes[0].section);
+        let c = &classes[0];
+        let show_sec = *multi.get(&(c.major.clone(), c.grade.clone())).unwrap_or(&false);
+        let t = cls_title(&c.major, &c.grade, c.section, show_sec);
         full.push_str(&format!("🏫 کلاس: {t}\n"));
         format!("گزارش {t} ({js})\n")
     };
@@ -1009,7 +1070,7 @@ pub fn generate_principal_report(conn: &Connection, major: Option<&str>, grade: 
             for s in &snaps[0].students {
                 if active.iter().all(|&p| matches!(s.period_statuses[p], AttendanceStatus::Absent | AttendanceStatus::Excused)) {
                     fd_ids.insert(s.student_id);
-                    let tag = if active.iter().all(|&p| s.period_statuses[p] == AttendanceStatus::Excused) { "موجه" } else { "غایب" };
+                    let tag = if active.iter().all(|&p| s.period_statuses[p] == AttendanceStatus::Excused) { "غیبت موجه" } else { "غایب" };
                     fd_full.push(format!("{} {} ({tag})", s.first_name, s.last_name));
                     fd_sms.push(format!("{} {}({tag})", s.first_name, s.last_name));
                 }
@@ -1026,11 +1087,16 @@ pub fn generate_principal_report(conn: &Connection, major: Option<&str>, grade: 
                 if fd_ids.contains(&s.student_id) { continue; }
                 match st {
                     AttendanceStatus::Absent => { tpa += 1; has_issue = true; fi.push(format!("{} {} (غایب)", s.first_name, s.last_name)); si.push(format!("{} {}(غایب)", s.first_name, s.last_name)); }
-                    AttendanceStatus::Excused => { tpa += 1; has_issue = true; fi.push(format!("{} {} (موجه)", s.first_name, s.last_name)); si.push(format!("{} {}(موجه)", s.first_name, s.last_name)); }
-                    AttendanceStatus::Late => { tla += 1; has_issue = true; fi.push(format!("{} {} (تأخیر)", s.first_name, s.last_name)); si.push(format!("{} {}(تأخیر)", s.first_name, s.last_name)); }
+                    AttendanceStatus::Excused => { tpa += 1; has_issue = true; fi.push(format!("{} {} (غیبت موجه)", s.first_name, s.last_name)); si.push(format!("{} {}(غیبت موجه)", s.first_name, s.last_name)); }
+                    AttendanceStatus::Late => {
+                        tla += 1; has_issue = true;
+                        let lt = late_suffix(&s.event_time, &s.note);
+                        fi.push(format!("{} {} ({lt})", s.first_name, s.last_name));
+                        si.push(format!("{} {}({lt})", s.first_name, s.last_name));
+                    }
                     AttendanceStatus::LeftClass => {
                         tlc += 1; has_issue = true;
-                        let ex = exit_suffix(&s.exit_time, &s.note);
+                        let ex = exit_suffix(&s.event_time, &s.note);
                         fi.push(format!("{} {} ({ex})", s.first_name, s.last_name));
                         si.push(format!("{} {}({ex})", s.first_name, s.last_name));
                     }
@@ -1043,7 +1109,8 @@ pub fn generate_principal_report(conn: &Connection, major: Option<&str>, grade: 
 
         if is_whole {
             if !has_issue { continue; }
-            let h = cls_title(&cls.major, &cls.grade, cls.section);
+            let show_sec = *multi.get(&(cls.major.clone(), cls.grade.clone())).unwrap_or(&false);
+            let h = cls_title(&cls.major, &cls.grade, cls.section, show_sec);
             full.push_str(&format!("\n────────────\n🏫 {h}\n"));
             sms.push_str(&format!("\n[{h}]\n"));
         } else { full.push_str("────────────────────\n"); }
@@ -1099,6 +1166,7 @@ pub fn export_daily_csv(conn: &Connection, major: &str, grade: &str, section: i3
 
 pub fn export_daily_xlsx(conn: &Connection, major: &str, grade: &str, section: i32, date_iso: &str, all_classes: bool) -> Result<Vec<u8>, CoreError> {
     let all = db::get_classes(conn)?;
+    let multi = build_multi_section_map(&all);
     let classes: Vec<ClassGroup> = if all_classes { all } else { all.into_iter().filter(|c| c.major == major && c.grade == grade && c.section == section).collect() };
     if classes.is_empty() { return Err(CoreError::InvalidInput("کلاسی برای خروجی نیست".into())); }
 
@@ -1121,8 +1189,8 @@ pub fn export_daily_xlsx(conn: &Connection, major: &str, grade: &str, section: i
             db::get_class_attendance(conn, &cls.major, &cls.grade, cls.section, date_iso, Period::Fourth, "")?,
         ];
         let sh = wb.add_worksheet();
-        let raw = if cls.major.is_empty() { format!("{} {}", cls.grade, cls.section) } else { format!("{} {} {}", cls.major, cls.grade, cls.section) };
-        sh.set_name(&unique_name(&raw, &mut used)).map_err(|e| CoreError::Import(e.to_string()))?;
+        let show_sec = *multi.get(&(cls.major.clone(), cls.grade.clone())).unwrap_or(&false);
+        sh.set_name(&unique_name(&cls_title(&cls.major, &cls.grade, cls.section, show_sec), &mut used)).map_err(|e| CoreError::Import(e.to_string()))?;
         sh.set_right_to_left(true);
         for (c, h) in hdrs.iter().enumerate() { let _ = sh.write_string_with_format(0, c as u16, *h, &hf); }
         for (idx, s) in snaps[0].students.iter().enumerate() {
@@ -1138,11 +1206,11 @@ pub fn export_daily_xlsx(conn: &Connection, major: &str, grade: &str, section: i
                 let row_p = &snaps[p].students[idx];
                 let st = s.period_statuses[p];
                 let (txt, fmt) = match st {
-                    AttendanceStatus::Absent => (st.label_fa().to_string(), &af),
-                    AttendanceStatus::Late => (st.label_fa().to_string(), &lf),
-                    AttendanceStatus::Excused => (st.label_fa().to_string(), &ef),
-                    AttendanceStatus::LeftClass => (exit_suffix(&row_p.exit_time, &row_p.note), &lcf),
-                    _ => (st.label_fa().to_string(), &pf),
+                    AttendanceStatus::Absent => ("غایب".to_string(), &af),
+                    AttendanceStatus::Late => (late_suffix(&row_p.event_time, &row_p.note), &lf),
+                    AttendanceStatus::Excused => ("غیبت موجه".to_string(), &ef),
+                    AttendanceStatus::LeftClass => (exit_suffix(&row_p.event_time, &row_p.note), &lcf),
+                    _ => ("حاضر".to_string(), &pf),
                 };
                 let _ = sh.write_string_with_format(r, (7 + p) as u16, &txt, fmt);
             }
@@ -1168,7 +1236,6 @@ pub fn export_gradebook_xlsx(conn: &Connection, major: &str, grade: &str, sectio
     sh.set_right_to_left(true);
     let hf = Format::new().set_bold().set_font_name("Vazirmatn").set_background_color(Color::RGB(0x4C1D95)).set_font_color(Color::White).set_align(FormatAlign::Center);
     let cf = Format::new().set_font_name("Vazirmatn").set_align(FormatAlign::Center);
-
     for (c, h) in ["ردیف", "نام", "نام خانوادگی", "نام پدر"].iter().enumerate() { let _ = sh.write_string_with_format(0, c as u16, *h, &hf); }
     for (ci, cat) in cats.iter().enumerate() { let _ = sh.write_string_with_format(0, (4 + ci) as u16, &cat.name, &hf); }
     for (idx, s) in snap.students.iter().enumerate() {
@@ -1178,16 +1245,14 @@ pub fn export_gradebook_xlsx(conn: &Connection, major: &str, grade: &str, sectio
         let _ = sh.write_string_with_format(r, 2, &s.last_name, &cf);
         let _ = sh.write_string_with_format(r, 3, &s.father_name, &cf);
         for (ci, cat) in cats.iter().enumerate() {
-            if let Some(sc) = score_map.get(&(s.student_id, cat.id)) {
-                let _ = sh.write_string_with_format(r, (4 + ci) as u16, sc, &cf);
-            }
+            if let Some(sc) = score_map.get(&(s.student_id, cat.id)) { let _ = sh.write_string_with_format(r, (4 + ci) as u16, sc, &cf); }
         }
     }
     sh.autofit();
     wb.save_to_buffer().map_err(|e| CoreError::Import(e.to_string()))
 }
 
-pub fn export_monthly_xlsx(rep: &MonthlyClassReport, major: &str, grade: &str, sec: i32) -> Result<Vec<u8>, CoreError> {
+pub fn export_monthly_xlsx(rep: &MonthlyClassReport, major: &str, grade: &str, sec: i32, show_sec: bool) -> Result<Vec<u8>, CoreError> {
     let mut wb = Workbook::new();
     let sh = wb.add_worksheet();
     let mut used = HashSet::new();
@@ -1195,10 +1260,10 @@ pub fn export_monthly_xlsx(rep: &MonthlyClassReport, major: &str, grade: &str, s
     sh.set_right_to_left(true);
     let hf = Format::new().set_bold().set_font_name("Vazirmatn").set_background_color(Color::RGB(0x0D47A1)).set_font_color(Color::White).set_align(FormatAlign::Center);
     let cf = Format::new().set_font_name("Vazirmatn").set_align(FormatAlign::Center);
-    for (c, h) in ["ردیف", "کلاس", "نام", "نام خانوادگی", "نام پدر", "کد ملی", "حاضر", "غایب", "کل روز", "تأخیر", "موجه", "خروج", "درصد"].iter().enumerate() {
+    for (c, h) in ["ردیف", "کلاس", "نام", "نام خانوادگی", "نام پدر", "کد ملی", "حاضر", "غایب", "کل روز", "تأخیر", "غیبت موجه", "خروج", "درصد"].iter().enumerate() {
         let _ = sh.write_string_with_format(0, c as u16, *h, &hf);
     }
-    let cl = cls_title(major, grade, sec);
+    let cl = cls_title(major, grade, sec, show_sec);
     for (i, s) in rep.students.iter().enumerate() {
         let r = (i + 1) as u32;
         let _ = sh.write_number_with_format(r, 0, (i + 1) as f64, &cf);
@@ -1220,7 +1285,7 @@ pub fn export_monthly_xlsx(rep: &MonthlyClassReport, major: &str, grade: &str, s
 }
 
 pub fn export_monthly_csv(rep: &MonthlyClassReport, major: &str, grade: &str, sec: i32) -> String {
-    let mut csv = String::from("\u{FEFF}ردیف,ماه,رشته,پایه,شعبه,نام,نام خانوادگی,نام پدر,کد ملی,حاضر,غایب,کل روز,تأخیر,موجه,خروج,درصد حضور\n");
+    let mut csv = String::from("\u{FEFF}ردیف,ماه,رشته,پایه,شعبه,نام,نام خانوادگی,نام پدر,کد ملی,حاضر,غایب,کل روز,تأخیر,غیبت موجه,خروج,درصد حضور\n");
     for (i, s) in rep.students.iter().enumerate() {
         csv.push_str(&format!("{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.1}%\n",
             i + 1, rep.month_label, major, grade, sec, s.first_name, s.last_name, s.father_name, s.national_id,
@@ -1267,7 +1332,7 @@ pub use models::{
     AttendanceStatus, BackupStats, ClassAnalytics, ClassAttendanceSnapshot, ClassGroup, CoreError,
     GradeCategory, ImportReport, JalaliDayCell, JalaliMonthGrid, JalaliYearMonth,
     MonthlyClassReport, MonthlyStudentStat, Period, PeriodSummary, PrincipalReportBundle,
-    SavedContact, StudentAttendanceRow, StudentGradeRow, TopStudentCount,
+    SavedContact, StudentAttendanceRow, StudentGradeRow, StudentMonthlyEvent, TopStudentCount,
 };
 
 use rusqlite::Connection;
@@ -1298,9 +1363,9 @@ impl AttendanceEngine {
         db::get_class_attendance(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, period, &search_query)
     }
 
-    pub fn set_attendance(&self, student_id: i64, date_iso: String, period: Period, status: AttendanceStatus, exit_time: String, note: String, teacher_name: String, lesson_name: String, class_time: String) -> Result<(), CoreError> {
+    pub fn set_attendance(&self, student_id: i64, date_iso: String, period: Period, status: AttendanceStatus, event_time: String, note: String, teacher_name: String, lesson_name: String, class_time: String) -> Result<(), CoreError> {
         let mut c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
-        db::set_attendance(&mut c, student_id, &date_iso, period, status, &exit_time, &note, &teacher_name, &lesson_name, &class_time)
+        db::set_attendance(&mut c, student_id, &date_iso, period, status, &event_time, &note, &teacher_name, &lesson_name, &class_time)
     }
 
     pub fn mark_class_status(&self, major: String, grade: String, section: i32, date_iso: String, period: Period, status: AttendanceStatus, only_unmarked: bool, teacher_name: String, lesson_name: String, class_time: String) -> Result<i32, CoreError> {
@@ -1371,6 +1436,10 @@ impl AttendanceEngine {
         db::get_class_analytics(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section)
     }
 
+    pub fn get_student_monthly_details(&self, student_id: i64, jalali_year: i32, jalali_month: i32) -> Result<Vec<StudentMonthlyEvent>, CoreError> {
+        db::get_student_monthly_details(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, student_id, jalali_year, jalali_month)
+    }
+
     pub fn generate_period_group_message(&self, major: String, grade: String, section: i32, date_iso: String, period: Period, target_status: AttendanceStatus, teacher_name: String, lesson_name: String, whole_school: bool) -> Result<String, CoreError> {
         reports::generate_period_group_message(&*self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?, &major, &grade, section, &date_iso, period, target_status, &teacher_name, &lesson_name, whole_school)
     }
@@ -1396,7 +1465,9 @@ impl AttendanceEngine {
     pub fn export_monthly_xlsx(&self, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<Vec<u8>, CoreError> {
         let c = self.conn.lock().map_err(|_| CoreError::Database("Lock".into()))?;
         let r = db::get_monthly_report(&c, &major, &grade, section, jalali_year, jalali_month)?;
-        reports::export_monthly_xlsx(&r, &major, &grade, section)
+        let all = db::get_classes(&c)?;
+        let show_sec = all.iter().filter(|x| x.major == major && x.grade == grade).count() > 1;
+        reports::export_monthly_xlsx(&r, &major, &grade, section, show_sec)
     }
 
     pub fn export_monthly_csv(&self, major: String, grade: String, section: i32, jalali_year: i32, jalali_month: i32) -> Result<String, CoreError> {
@@ -1439,32 +1510,38 @@ impl AttendanceEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    const SAMPLE: &str = "ردیف,نام مدرسه,رشته,پایه,شعبه,نام,نام خانوادگی,نام پدر,کد ملی,شماره موبایل\n1,نمونه,صنایع شیمیایی,یازدهم,1,محمد,آزادی,هارون,4700153423,9170327544\n";
+    const SAMPLE: &str = "ردیف,نام مدرسه,رشته,پایه,شعبه,نام,نام خانوادگی,نام پدر,کد ملی,شماره موبایل\n\
+1,نمونه,الکتروتکنیک,دهم,1,علی,رضایی,حسن,4700153423,9170327544\n\
+2,نمونه,صنایع شیمیایی,یازدهم,1,محمد,آزادی,هارون,4700153424,9170327545\n\
+3,نمونه,صنایع شیمیایی,یازدهم,2,ابراهیم,احمدی,راشد,4700153425,9170327546\n";
 
     #[test]
-    fn test_v4_left_class_gradebook_contacts_backup() {
+    fn test_v5_single_branch_excused_late_time_and_monthly_dates() {
         let e = AttendanceEngine::new(":memory:".into()).unwrap();
         e.import_file_bytes("s.csv".into(), SAMPLE.as_bytes().to_vec(), true).unwrap();
-        let snap = e.get_class_attendance("صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-10-12".into(), Period::First, "".into()).unwrap();
-        let sid = snap.students[0].student_id;
 
-        e.set_attendance(sid, "2025-10-12".into(), Period::First, AttendanceStatus::LeftClass, "09:42".into(), "برنگشت".into(), "دبیر".into(), "شیمی".into(), "08:00".into()).unwrap();
-        let rep = e.generate_principal_report("صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-10-12".into(), false, "دبیر".into()).unwrap();
-        assert!(rep.sms_text.contains("۰۹:۴۲"));
+        let elec = e.get_class_attendance("الکتروتکنیک".into(), "دهم".into(), 1, "2025-11-26".into(), Period::First, "".into()).unwrap();
+        let sid = elec.students[0].student_id;
+        e.set_attendance(sid, "2025-11-26".into(), Period::First, AttendanceStatus::Late, "08:17".into(), "ترافیک".into(), "دبیر".into(), "برق".into(), "08:00".into()).unwrap();
+        e.set_attendance(sid, "2025-11-26".into(), Period::Second, AttendanceStatus::Excused, "".into(), "".into(), "دبیر".into(), "برق".into(), "09:00".into()).unwrap();
 
-        let cats = e.get_grade_categories().unwrap();
-        assert!(cats.len() >= 9);
-        let custom_id = e.add_grade_category("مستمر بهمن".into()).unwrap();
-        e.set_student_grade(sid, custom_id, "19.5".into(), "عالی".into()).unwrap();
-        assert!(e.export_gradebook_xlsx("صنایع شیمیایی".into(), "یازدهم".into(), 1).unwrap().starts_with(b"PK\x03\x04"));
+        let rep = e.generate_principal_report("الکتروتکنیک".into(), "دهم".into(), 1, "2025-11-26".into(), false, "دبیر".into()).unwrap();
+        assert!(!rep.full_text.contains("شعبه")); // کلاس تک‌شعبه‌ای نباید شعبه داشته باشد
+        assert!(!rep.sms_text.contains("شعبه"));
+        assert!(rep.full_text.contains("غیبت موجه"));
+        assert!(rep.sms_text.contains("غیبت موجه"));
+        assert!(rep.sms_text.contains("تأخیر ساعت ۰۸:۱۷"));
 
-        e.save_contact("آقای رضایی".into(), "مدیر".into(), "09171234567".into()).unwrap();
-        let bk = e.export_backup_json().unwrap();
-        let e2 = AttendanceEngine::new(":memory:".into()).unwrap();
-        e2.restore_backup_json(bk).unwrap();
-        let st = e2.get_backup_stats().unwrap();
-        assert_eq!(st.grades_count, 1);
-        assert_eq!(st.contacts_count, 1);
+        // کلاس دوشعبه‌ای باید شعبه را حفظ کند
+        let chem = e.get_class_attendance("صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-11-26".into(), Period::First, "".into()).unwrap();
+        e.set_attendance(chem.students[0].student_id, "2025-11-26".into(), Period::First, AttendanceStatus::Absent, "".into(), "".into(), "".into(), "".into(), "".into()).unwrap();
+        let chem_rep = e.generate_principal_report("صنایع شیمیایی".into(), "یازدهم".into(), 1, "2025-11-26".into(), false, "".into()).unwrap();
+        assert!(chem_rep.full_text.contains("شعبه ۱"));
+
+        // بررسی جزئیات تاریخچه ماهانه دانش‌آموز در آذر ۱۴۰۴
+        let details = e.get_student_monthly_details(sid, 1404, 9).unwrap();
+        assert_eq!(details.len(), 2);
+        assert!(details[0].jalali_date.contains("آذر"));
     }
 }
 ''',
@@ -1477,7 +1554,7 @@ def main():
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(content, encoding="utf-8", newline="\n")
         print(f"Created: {rel}")
-    print(f"\nPart 1 (Rust Core v4.0) done: {len(FILES)} files.")
+    print(f"\nPart 1 (Rust Core v5.0) done: {len(FILES)} files.")
 
 
 if __name__ == "__main__":

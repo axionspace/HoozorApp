@@ -18,18 +18,20 @@ import uniffi.hozoor_core.ClassGroup
 import uniffi.hozoor_core.GradeCategory
 import uniffi.hozoor_core.JalaliMonthGrid
 import uniffi.hozoor_core.MonthlyClassReport
+import uniffi.hozoor_core.MonthlyStudentStat
 import uniffi.hozoor_core.Period
 import uniffi.hozoor_core.PeriodSummary
 import uniffi.hozoor_core.PrincipalReportBundle
 import uniffi.hozoor_core.SavedContact
 import uniffi.hozoor_core.StudentAttendanceRow
 import uniffi.hozoor_core.StudentGradeRow
+import uniffi.hozoor_core.StudentMonthlyEvent
 import java.time.LocalDate
 
 @Immutable
 data class AttendanceUiState(
     val isLoading: Boolean = true,
-    val activeTab: Int = 0, // 0=حضور روزانه، 1=دفتر نمره، 2=آمار و ماهانه
+    val activeTab: Int = 0,
     val themeMode: String = "system",
     val dynamicColorEnabled: Boolean = true,
     val classes: List<ClassGroup> = emptyList(),
@@ -49,14 +51,14 @@ data class AttendanceUiState(
     val principalPhone: String = "",
     val recipientName: String = "",
     val searchQuery: String = "",
+    val gradebookSearchQuery: String = "",
+    val monthlySearchQuery: String = "",
     val isPeriodSaved: Boolean = false,
     val students: List<StudentAttendanceRow> = emptyList(),
     val summary: PeriodSummary = PeriodSummary(0, 0, 0, 0, 0, 0),
-    // دفتر نمره مستمر / پودمانی / دلخواه
     val gradeCategories: List<GradeCategory> = emptyList(),
     val selectedGradeCategoryId: Long = 0L,
     val classGrades: List<StudentGradeRow> = emptyList(),
-    // مخاطبین و گزارش و پشتیبان
     val savedContacts: List<SavedContact> = emptyList(),
     val classAnalytics: ClassAnalytics? = null,
     val backupStats: BackupStats? = null,
@@ -67,6 +69,8 @@ data class AttendanceUiState(
     val monthlyMonth: Int = 7,
     val monthlyReport: MonthlyClassReport? = null,
     val sortMonthlyByAbsence: Boolean = false,
+    val inspectingMonthlyStudent: MonthlyStudentStat? = null,
+    val inspectingMonthlyEvents: List<StudentMonthlyEvent> = emptyList(),
     val snackbarMessage: String? = null
 )
 
@@ -192,12 +196,29 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
 
     fun toggleMonthlySort() { _uiState.update { it.copy(sortMonthlyByAbsence = !it.sortMonthlyByAbsence) } }
     fun updateSearch(q: String) { _uiState.update { it.copy(searchQuery = q) }; loadAttendanceSnapshot() }
+    fun updateGradebookSearch(q: String) { _uiState.update { it.copy(gradebookSearchQuery = q) } }
+    fun updateMonthlySearch(q: String) { _uiState.update { it.copy(monthlySearchQuery = q) } }
 
-    fun setStudentStatus(studentId: Long, status: AttendanceStatus, exitTime: String = "", note: String = "") {
+    fun openStudentMonthlyDetails(stat: MonthlyStudentStat) {
+        val st = _uiState.value
+        _uiState.update { it.copy(inspectingMonthlyStudent = stat, inspectingMonthlyEvents = emptyList()) }
+        viewModelScope.launch {
+            val events = withContext(Dispatchers.IO) {
+                engine.getStudentMonthlyDetails(stat.studentId, st.monthlyYear, st.monthlyMonth)
+            }
+            _uiState.update { it.copy(inspectingMonthlyEvents = events) }
+        }
+    }
+
+    fun closeStudentMonthlyDetails() {
+        _uiState.update { it.copy(inspectingMonthlyStudent = null, inspectingMonthlyEvents = emptyList()) }
+    }
+
+    fun setStudentStatus(studentId: Long, status: AttendanceStatus, eventTime: String = "", note: String = "") {
         val st = _uiState.value
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                engine.setAttendance(studentId, st.selectedDate.toString(), st.selectedPeriod, status, exitTime, note, st.teacherName, st.lessonName, st.classTime)
+                engine.setAttendance(studentId, st.selectedDate.toString(), st.selectedPeriod, status, eventTime, note, st.teacherName, st.lessonName, st.classTime)
             }
             loadAttendanceSnapshot()
         }
@@ -209,8 +230,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
             val n = withContext(Dispatchers.IO) {
                 engine.markClassStatus(cls.major, cls.grade, cls.section, st.selectedDate.toString(), st.selectedPeriod, AttendanceStatus.PRESENT, false, st.teacherName, st.lessonName, st.classTime)
             }
-            loadAttendanceSnapshot()
-            showMessage("همه $n دانش‌آموز در حالت حاضر ثبت شدند")
+            loadAttendanceSnapshot(); showMessage("همه $n دانش‌آموز در حالت حاضر ثبت شدند")
         }
     }
 
@@ -224,7 +244,6 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         }
     }
 
-    // ===== دفتر نمره =====
     fun selectGradeCategory(catId: Long) { _uiState.update { it.copy(selectedGradeCategoryId = catId) }; loadGradebook() }
 
     fun addGradeCategory(name: String) {
@@ -233,8 +252,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
                 val newId = withContext(Dispatchers.IO) { engine.addGradeCategory(name) }
                 val cats = withContext(Dispatchers.IO) { engine.getGradeCategories() }
                 _uiState.update { it.copy(gradeCategories = cats, selectedGradeCategoryId = newId) }
-                loadGradebook()
-                showMessage("عنوان «$name» اضافه شد")
+                loadGradebook(); showMessage("عنوان «$name» اضافه شد")
             } catch (e: Exception) { showMessage(e.message ?: "خطا") }
         }
     }
@@ -244,29 +262,22 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
             withContext(Dispatchers.IO) { engine.deleteGradeCategory(catId) }
             val cats = withContext(Dispatchers.IO) { engine.getGradeCategories() }
             _uiState.update { it.copy(gradeCategories = cats, selectedGradeCategoryId = cats.firstOrNull()?.id ?: 0L) }
-            loadGradebook()
-            showMessage("عنوان نمره حذف شد")
+            loadGradebook(); showMessage("عنوان نمره حذف شد")
         }
     }
 
     fun setStudentGrade(studentId: Long, categoryId: Long, score: String, note: String) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { engine.setStudentGrade(studentId, categoryId, score, note) }
-            loadGradebook()
-            loadAttendanceSnapshot()
-            showMessage("نمره ثبت شد")
+            loadGradebook(); loadAttendanceSnapshot(); showMessage("نمره ثبت شد")
         }
     }
 
     fun exportGradebookExcel(onReady: (String, ByteArray) -> Unit) {
         val cls = _uiState.value.selectedClass ?: return
-        viewModelScope.launch {
-            val bytes = withContext(Dispatchers.IO) { engine.exportGradebookXlsx(cls.major, cls.grade, cls.section) }
-            onReady("grades_${cls.grade}_${cls.section}.xlsx", bytes)
-        }
+        viewModelScope.launch { onReady("grades_${cls.grade}_${cls.section}.xlsx", withContext(Dispatchers.IO) { engine.exportGradebookXlsx(cls.major, cls.grade, cls.section) }) }
     }
 
-    // ===== مخاطبین =====
     fun saveContact(name: String, role: String, phone: String) {
         viewModelScope.launch {
             try {
@@ -281,47 +292,36 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
     fun deleteContact(id: Long) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { engine.deleteContact(id) }
-            val contacts = withContext(Dispatchers.IO) { engine.getSavedContacts() }
-            _uiState.update { it.copy(savedContacts = contacts) }
+            _uiState.update { it.copy(savedContacts = withContext(Dispatchers.IO) { engine.getSavedContacts() }) }
         }
     }
 
-    // ===== دانش‌آموزان، ورود/خروج و پشتیبان =====
     fun addStudentToCurrentClass(f: String, l: String, fa: String, nid: String, mob: String) {
         val cls = _uiState.value.selectedClass ?: return
         viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) { engine.addStudent(cls.schoolName, cls.major, cls.grade, cls.section, f, l, fa, nid, mob) }
-                refreshClassesAndData(); showMessage("دانش‌آموز اضافه شد")
-            } catch (e: Exception) { showMessage(e.message ?: "خطا") }
+            try { withContext(Dispatchers.IO) { engine.addStudent(cls.schoolName, cls.major, cls.grade, cls.section, f, l, fa, nid, mob) }; refreshClassesAndData(); showMessage("دانش‌آموز اضافه شد") }
+            catch (e: Exception) { showMessage(e.message ?: "خطا") }
         }
     }
 
     fun updateStudent(id: Long, f: String, l: String, fa: String, nid: String, mob: String) {
         viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) { engine.updateStudent(id, f, l, fa, nid, mob) }
-                loadAttendanceSnapshot(); showMessage("اطلاعات ذخیره شد")
-            } catch (e: Exception) { showMessage(e.message ?: "خطا") }
+            try { withContext(Dispatchers.IO) { engine.updateStudent(id, f, l, fa, nid, mob) }; loadAttendanceSnapshot(); showMessage("اطلاعات ذخیره شد") }
+            catch (e: Exception) { showMessage(e.message ?: "خطا") }
         }
     }
 
     fun deleteStudent(id: Long) { viewModelScope.launch { withContext(Dispatchers.IO) { engine.deleteStudent(id) }; refreshClassesAndData(); showMessage("دانش‌آموز حذف شد") } }
     fun deleteCurrentClass() {
         val cls = _uiState.value.selectedClass ?: return
-        viewModelScope.launch {
-            val n = withContext(Dispatchers.IO) { engine.deleteClass(cls.major, cls.grade, cls.section) }
-            refreshClassesAndData(); showMessage("کلاس و $n دانش‌آموز حذف شدند")
-        }
+        viewModelScope.launch { val n = withContext(Dispatchers.IO) { engine.deleteClass(cls.major, cls.grade, cls.section) }; refreshClassesAndData(); showMessage("کلاس و $n دانش‌آموز حذف شدند") }
     }
 
     fun importFileBytes(name: String, bytes: ByteArray, replace: Boolean) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            try {
-                val rep = withContext(Dispatchers.IO) { engine.importFileBytes(name, bytes, replace) }
-                refreshClassesAndData(); showMessage("${rep.importedCount} دانش‌آموز در ${rep.classesCount} کلاس وارد شد")
-            } catch (e: Exception) { _uiState.update { it.copy(isLoading = false) }; showMessage("خطا: ${e.message}") }
+            try { val rep = withContext(Dispatchers.IO) { engine.importFileBytes(name, bytes, replace) }; refreshClassesAndData(); showMessage("${rep.importedCount} دانش‌آموز در ${rep.classesCount} کلاس وارد شد") }
+            catch (e: Exception) { _uiState.update { it.copy(isLoading = false) }; showMessage("خطا: ${e.message}") }
         }
     }
 
@@ -340,10 +340,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
 
     fun exportBackupJson(onReady: (String, ByteArray) -> Unit) {
         val d = _uiState.value.selectedDate
-        viewModelScope.launch {
-            val json = withContext(Dispatchers.IO) { engine.exportBackupJson() }
-            onReady("hozoor_backup_$d.json", json.toByteArray(Charsets.UTF_8))
-        }
+        viewModelScope.launch { onReady("hozoor_backup_$d.json", withContext(Dispatchers.IO) { engine.exportBackupJson() }.toByteArray(Charsets.UTF_8)) }
     }
 
     fun exportTemplateExcel(onReady: (String, ByteArray) -> Unit) {
@@ -355,11 +352,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         _uiState.update { it.copy(reportWholeSchool = wholeSchool, sheetFeedback = null) }
         viewModelScope.launch {
             val (bundle, stats, contacts) = withContext(Dispatchers.IO) {
-                Triple(
-                    engine.generatePrincipalReport(cls.major, cls.grade, cls.section, st.selectedDate.toString(), wholeSchool, st.teacherName),
-                    engine.getBackupStats(),
-                    engine.getSavedContacts()
-                )
+                Triple(engine.generatePrincipalReport(cls.major, cls.grade, cls.section, st.selectedDate.toString(), wholeSchool, st.teacherName), engine.getBackupStats(), engine.getSavedContacts())
             }
             _uiState.update { it.copy(principalReport = bundle, backupStats = stats, savedContacts = contacts) }
         }
@@ -370,9 +363,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         _uiState.update { it.copy(sheetFeedback = null) }
         viewModelScope.launch {
             try {
-                val msg = withContext(Dispatchers.IO) {
-                    engine.generatePeriodGroupMessage(cls.major, cls.grade, cls.section, st.selectedDate.toString(), st.selectedPeriod, target, st.teacherName, st.lessonName, st.reportWholeSchool)
-                }
+                val msg = withContext(Dispatchers.IO) { engine.generatePeriodGroupMessage(cls.major, cls.grade, cls.section, st.selectedDate.toString(), st.selectedPeriod, target, st.teacherName, st.lessonName, st.reportWholeSchool) }
                 onReady(msg)
             } catch (e: Exception) { _uiState.update { it.copy(sheetFeedback = e.message ?: "موردی یافت نشد") } }
         }

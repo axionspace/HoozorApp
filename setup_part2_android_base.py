@@ -45,8 +45,8 @@ android {
         applicationId = "ir.hozoor.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 4
-        versionName = "4.0.0"
+        versionCode = 5
+        versionName = "5.0.0"
     }
 
     signingConfigs {
@@ -111,6 +111,10 @@ dependencies {
         <intent><action android:name="android.intent.action.SEND" /><data android:mimeType="text/plain" /></intent>
         <intent><action android:name="android.intent.action.DIAL" /><data android:scheme="tel" /></intent>
         <intent><action android:name="android.intent.action.PICK" /><data android:mimeType="vnd.android.cursor.dir/phone_v2" /></intent>
+        <intent><action android:name="android.intent.action.PICK" /><data android:mimeType="vnd.android.cursor.dir/contact" /></intent>
+        <package android:name="com.google.android.contacts" />
+        <package android:name="com.android.contacts" />
+        <package android:name="com.samsung.android.app.contacts" />
     </queries>
 
     <application
@@ -254,6 +258,47 @@ object FileShareHelper {
         context.startActivity(Intent.createChooser(intent, chooserTitle))
     }
 
+    /**
+     * ساخت Intent مطمئن انتخاب مخاطب برای همه گوشی‌ها (به‌ویژه رفع باگ شیائومی MIUI/HyperOS
+     * که در حالت عادی فایل منیجر را باز می‌کرد). بدون نیاز به مجوز READ_CONTACTS.
+     */
+    fun createPickPhoneContactIntent(context: Context): Intent {
+        val intent = Intent(Intent.ACTION_PICK).apply {
+            type = ContactsContract.CommonDataKinds.Phone.CONTENT_TYPE
+        }
+        val pm = context.packageManager
+        val resolved = runCatching { pm.queryIntentActivities(intent, 0) }.getOrDefault(emptyList())
+        val realContactsApp = resolved.firstOrNull { info ->
+            val pkg = info.activityInfo.packageName.lowercase()
+            val notFileManager = !pkg.contains("file") && !pkg.contains("explorer") && !pkg.contains("document")
+            notFileManager && (pkg.contains("contacts") || pkg.contains("dialer") || pkg.contains("phone"))
+        } ?: resolved.firstOrNull { info ->
+            val pkg = info.activityInfo.packageName.lowercase()
+            !pkg.contains("file") && !pkg.contains("explorer") && !pkg.contains("document")
+        }
+        if (realContactsApp != null) {
+            intent.setPackage(realContactsApp.activityInfo.packageName)
+        }
+        return intent
+    }
+
+    fun extractPhoneContact(context: Context, uri: Uri): Pair<String, String>? {
+        val proj = arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER)
+        context.contentResolver.query(uri, proj, null, null, null)?.use { c ->
+            if (c.moveToFirst()) {
+                val nIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                val pIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+                val name = if (nIdx >= 0) c.getString(nIdx).orEmpty() else ""
+                val raw = if (pIdx >= 0) c.getString(pIdx).orEmpty() else ""
+                val clean = raw.replace(Regex("[^0-9+]"), "")
+                    .let { if (it.startsWith("+98")) "0" + it.removePrefix("+98") else it }
+                    .replace(Regex("[^0-9]"), "")
+                if (clean.isNotBlank()) return name.ifBlank { "مخاطب" } to clean
+            }
+        }
+        return null
+    }
+
     fun openSmsApp(context: Context, phone: String, body: String): Boolean {
         val clean = phone.trim()
         val list = listOf(
@@ -278,20 +323,12 @@ object FileShareHelper {
             else -> d
         }
         val url = if (intl.isNotBlank()) "https://wa.me/$intl?text=${Uri.encode(body)}" else "https://wa.me/?text=${Uri.encode(body)}"
-        return runCatching {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-            true
-        }.getOrElse {
-            shareText(context, body, "ارسال پیام")
-            false
-        }
+        return runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))); true }
+            .getOrElse { shareText(context, body, "ارسال پیام"); false }
     }
 
     fun shareText(context: Context, text: String, title: String) {
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, text)
-        }
+        val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, text) }
         context.startActivity(Intent.createChooser(intent, title))
     }
 
@@ -300,23 +337,11 @@ object FileShareHelper {
         cm.setPrimaryClip(ClipData.newPlainText(label, text))
     }
 
-    /** استخراج نام و شماره موبایل از مخاطب انتخاب‌شده توسط سیستم اندروید (بدون نیاز به مجوز READ_CONTACTS) */
-    fun extractPhoneContact(context: Context, uri: Uri): Pair<String, String>? {
-        val proj = arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER)
-        context.contentResolver.query(uri, proj, null, null, null)?.use { c ->
-            if (c.moveToFirst()) {
-                val nIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
-                val pIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
-                val name = if (nIdx >= 0) c.getString(nIdx).orEmpty() else ""
-                val raw = if (pIdx >= 0) c.getString(pIdx).orEmpty() else ""
-                val clean = raw.replace(Regex("[^0-9+]"), "")
-                    .let { if (it.startsWith("+98")) "0" + it.removePrefix("+98") else it }
-                    .replace(Regex("[^0-9]"), "")
-                if (clean.isNotBlank()) return name.ifBlank { "مخاطب" } to clean
-            }
-        }
-        return null
-    }
+    fun normalizePersianSearch(text: String): String = text.trim()
+        .replace('ي', 'ی').replace('ى', 'ی').replace('ك', 'ک')
+        .replace('۰', '0').replace('۱', '1').replace('۲', '2').replace('۳', '3').replace('۴', '4')
+        .replace('۵', '5').replace('۶', '6').replace('۷', '7').replace('۸', '8').replace('۹', '9')
+        .lowercase()
 
     fun resolveFileName(context: Context, uri: Uri): String {
         context.contentResolver.query(uri, null, null, null, null)?.use { c ->
@@ -387,11 +412,11 @@ object StatusColors {
     val OnPresent = Color.White
     val Absent = Color(0xFFDC2626)
     val OnAbsent = Color.White
-    val Late = Color(0xFFFACC15)
+    val Late = Color(0xFFF59E0B)
     val OnLate = Color(0xFF1A1A1A)
     val Excused = Color(0xFF2563EB)
     val OnExcused = Color.White
-    val LeftClass = Color(0xFF9333EA) // بنفش پرکنتراست برای خروج از کلاس
+    val LeftClass = Color(0xFF9333EA)
     val OnLeftClass = Color.White
 }
 
@@ -449,18 +474,20 @@ import uniffi.hozoor_core.ClassGroup
 import uniffi.hozoor_core.GradeCategory
 import uniffi.hozoor_core.JalaliMonthGrid
 import uniffi.hozoor_core.MonthlyClassReport
+import uniffi.hozoor_core.MonthlyStudentStat
 import uniffi.hozoor_core.Period
 import uniffi.hozoor_core.PeriodSummary
 import uniffi.hozoor_core.PrincipalReportBundle
 import uniffi.hozoor_core.SavedContact
 import uniffi.hozoor_core.StudentAttendanceRow
 import uniffi.hozoor_core.StudentGradeRow
+import uniffi.hozoor_core.StudentMonthlyEvent
 import java.time.LocalDate
 
 @Immutable
 data class AttendanceUiState(
     val isLoading: Boolean = true,
-    val activeTab: Int = 0, // 0=حضور روزانه، 1=دفتر نمره، 2=آمار و ماهانه
+    val activeTab: Int = 0,
     val themeMode: String = "system",
     val dynamicColorEnabled: Boolean = true,
     val classes: List<ClassGroup> = emptyList(),
@@ -480,14 +507,14 @@ data class AttendanceUiState(
     val principalPhone: String = "",
     val recipientName: String = "",
     val searchQuery: String = "",
+    val gradebookSearchQuery: String = "",
+    val monthlySearchQuery: String = "",
     val isPeriodSaved: Boolean = false,
     val students: List<StudentAttendanceRow> = emptyList(),
     val summary: PeriodSummary = PeriodSummary(0, 0, 0, 0, 0, 0),
-    // دفتر نمره مستمر / پودمانی / دلخواه
     val gradeCategories: List<GradeCategory> = emptyList(),
     val selectedGradeCategoryId: Long = 0L,
     val classGrades: List<StudentGradeRow> = emptyList(),
-    // مخاطبین و گزارش و پشتیبان
     val savedContacts: List<SavedContact> = emptyList(),
     val classAnalytics: ClassAnalytics? = null,
     val backupStats: BackupStats? = null,
@@ -498,6 +525,8 @@ data class AttendanceUiState(
     val monthlyMonth: Int = 7,
     val monthlyReport: MonthlyClassReport? = null,
     val sortMonthlyByAbsence: Boolean = false,
+    val inspectingMonthlyStudent: MonthlyStudentStat? = null,
+    val inspectingMonthlyEvents: List<StudentMonthlyEvent> = emptyList(),
     val snackbarMessage: String? = null
 )
 
@@ -623,12 +652,29 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
 
     fun toggleMonthlySort() { _uiState.update { it.copy(sortMonthlyByAbsence = !it.sortMonthlyByAbsence) } }
     fun updateSearch(q: String) { _uiState.update { it.copy(searchQuery = q) }; loadAttendanceSnapshot() }
+    fun updateGradebookSearch(q: String) { _uiState.update { it.copy(gradebookSearchQuery = q) } }
+    fun updateMonthlySearch(q: String) { _uiState.update { it.copy(monthlySearchQuery = q) } }
 
-    fun setStudentStatus(studentId: Long, status: AttendanceStatus, exitTime: String = "", note: String = "") {
+    fun openStudentMonthlyDetails(stat: MonthlyStudentStat) {
+        val st = _uiState.value
+        _uiState.update { it.copy(inspectingMonthlyStudent = stat, inspectingMonthlyEvents = emptyList()) }
+        viewModelScope.launch {
+            val events = withContext(Dispatchers.IO) {
+                engine.getStudentMonthlyDetails(stat.studentId, st.monthlyYear, st.monthlyMonth)
+            }
+            _uiState.update { it.copy(inspectingMonthlyEvents = events) }
+        }
+    }
+
+    fun closeStudentMonthlyDetails() {
+        _uiState.update { it.copy(inspectingMonthlyStudent = null, inspectingMonthlyEvents = emptyList()) }
+    }
+
+    fun setStudentStatus(studentId: Long, status: AttendanceStatus, eventTime: String = "", note: String = "") {
         val st = _uiState.value
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                engine.setAttendance(studentId, st.selectedDate.toString(), st.selectedPeriod, status, exitTime, note, st.teacherName, st.lessonName, st.classTime)
+                engine.setAttendance(studentId, st.selectedDate.toString(), st.selectedPeriod, status, eventTime, note, st.teacherName, st.lessonName, st.classTime)
             }
             loadAttendanceSnapshot()
         }
@@ -640,8 +686,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
             val n = withContext(Dispatchers.IO) {
                 engine.markClassStatus(cls.major, cls.grade, cls.section, st.selectedDate.toString(), st.selectedPeriod, AttendanceStatus.PRESENT, false, st.teacherName, st.lessonName, st.classTime)
             }
-            loadAttendanceSnapshot()
-            showMessage("همه $n دانش‌آموز در حالت حاضر ثبت شدند")
+            loadAttendanceSnapshot(); showMessage("همه $n دانش‌آموز در حالت حاضر ثبت شدند")
         }
     }
 
@@ -655,7 +700,6 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         }
     }
 
-    // ===== دفتر نمره =====
     fun selectGradeCategory(catId: Long) { _uiState.update { it.copy(selectedGradeCategoryId = catId) }; loadGradebook() }
 
     fun addGradeCategory(name: String) {
@@ -664,8 +708,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
                 val newId = withContext(Dispatchers.IO) { engine.addGradeCategory(name) }
                 val cats = withContext(Dispatchers.IO) { engine.getGradeCategories() }
                 _uiState.update { it.copy(gradeCategories = cats, selectedGradeCategoryId = newId) }
-                loadGradebook()
-                showMessage("عنوان «$name» اضافه شد")
+                loadGradebook(); showMessage("عنوان «$name» اضافه شد")
             } catch (e: Exception) { showMessage(e.message ?: "خطا") }
         }
     }
@@ -675,29 +718,22 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
             withContext(Dispatchers.IO) { engine.deleteGradeCategory(catId) }
             val cats = withContext(Dispatchers.IO) { engine.getGradeCategories() }
             _uiState.update { it.copy(gradeCategories = cats, selectedGradeCategoryId = cats.firstOrNull()?.id ?: 0L) }
-            loadGradebook()
-            showMessage("عنوان نمره حذف شد")
+            loadGradebook(); showMessage("عنوان نمره حذف شد")
         }
     }
 
     fun setStudentGrade(studentId: Long, categoryId: Long, score: String, note: String) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { engine.setStudentGrade(studentId, categoryId, score, note) }
-            loadGradebook()
-            loadAttendanceSnapshot()
-            showMessage("نمره ثبت شد")
+            loadGradebook(); loadAttendanceSnapshot(); showMessage("نمره ثبت شد")
         }
     }
 
     fun exportGradebookExcel(onReady: (String, ByteArray) -> Unit) {
         val cls = _uiState.value.selectedClass ?: return
-        viewModelScope.launch {
-            val bytes = withContext(Dispatchers.IO) { engine.exportGradebookXlsx(cls.major, cls.grade, cls.section) }
-            onReady("grades_${cls.grade}_${cls.section}.xlsx", bytes)
-        }
+        viewModelScope.launch { onReady("grades_${cls.grade}_${cls.section}.xlsx", withContext(Dispatchers.IO) { engine.exportGradebookXlsx(cls.major, cls.grade, cls.section) }) }
     }
 
-    // ===== مخاطبین =====
     fun saveContact(name: String, role: String, phone: String) {
         viewModelScope.launch {
             try {
@@ -712,47 +748,36 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
     fun deleteContact(id: Long) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { engine.deleteContact(id) }
-            val contacts = withContext(Dispatchers.IO) { engine.getSavedContacts() }
-            _uiState.update { it.copy(savedContacts = contacts) }
+            _uiState.update { it.copy(savedContacts = withContext(Dispatchers.IO) { engine.getSavedContacts() }) }
         }
     }
 
-    // ===== دانش‌آموزان، ورود/خروج و پشتیبان =====
     fun addStudentToCurrentClass(f: String, l: String, fa: String, nid: String, mob: String) {
         val cls = _uiState.value.selectedClass ?: return
         viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) { engine.addStudent(cls.schoolName, cls.major, cls.grade, cls.section, f, l, fa, nid, mob) }
-                refreshClassesAndData(); showMessage("دانش‌آموز اضافه شد")
-            } catch (e: Exception) { showMessage(e.message ?: "خطا") }
+            try { withContext(Dispatchers.IO) { engine.addStudent(cls.schoolName, cls.major, cls.grade, cls.section, f, l, fa, nid, mob) }; refreshClassesAndData(); showMessage("دانش‌آموز اضافه شد") }
+            catch (e: Exception) { showMessage(e.message ?: "خطا") }
         }
     }
 
     fun updateStudent(id: Long, f: String, l: String, fa: String, nid: String, mob: String) {
         viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) { engine.updateStudent(id, f, l, fa, nid, mob) }
-                loadAttendanceSnapshot(); showMessage("اطلاعات ذخیره شد")
-            } catch (e: Exception) { showMessage(e.message ?: "خطا") }
+            try { withContext(Dispatchers.IO) { engine.updateStudent(id, f, l, fa, nid, mob) }; loadAttendanceSnapshot(); showMessage("اطلاعات ذخیره شد") }
+            catch (e: Exception) { showMessage(e.message ?: "خطا") }
         }
     }
 
     fun deleteStudent(id: Long) { viewModelScope.launch { withContext(Dispatchers.IO) { engine.deleteStudent(id) }; refreshClassesAndData(); showMessage("دانش‌آموز حذف شد") } }
     fun deleteCurrentClass() {
         val cls = _uiState.value.selectedClass ?: return
-        viewModelScope.launch {
-            val n = withContext(Dispatchers.IO) { engine.deleteClass(cls.major, cls.grade, cls.section) }
-            refreshClassesAndData(); showMessage("کلاس و $n دانش‌آموز حذف شدند")
-        }
+        viewModelScope.launch { val n = withContext(Dispatchers.IO) { engine.deleteClass(cls.major, cls.grade, cls.section) }; refreshClassesAndData(); showMessage("کلاس و $n دانش‌آموز حذف شدند") }
     }
 
     fun importFileBytes(name: String, bytes: ByteArray, replace: Boolean) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            try {
-                val rep = withContext(Dispatchers.IO) { engine.importFileBytes(name, bytes, replace) }
-                refreshClassesAndData(); showMessage("${rep.importedCount} دانش‌آموز در ${rep.classesCount} کلاس وارد شد")
-            } catch (e: Exception) { _uiState.update { it.copy(isLoading = false) }; showMessage("خطا: ${e.message}") }
+            try { val rep = withContext(Dispatchers.IO) { engine.importFileBytes(name, bytes, replace) }; refreshClassesAndData(); showMessage("${rep.importedCount} دانش‌آموز در ${rep.classesCount} کلاس وارد شد") }
+            catch (e: Exception) { _uiState.update { it.copy(isLoading = false) }; showMessage("خطا: ${e.message}") }
         }
     }
 
@@ -771,10 +796,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
 
     fun exportBackupJson(onReady: (String, ByteArray) -> Unit) {
         val d = _uiState.value.selectedDate
-        viewModelScope.launch {
-            val json = withContext(Dispatchers.IO) { engine.exportBackupJson() }
-            onReady("hozoor_backup_$d.json", json.toByteArray(Charsets.UTF_8))
-        }
+        viewModelScope.launch { onReady("hozoor_backup_$d.json", withContext(Dispatchers.IO) { engine.exportBackupJson() }.toByteArray(Charsets.UTF_8)) }
     }
 
     fun exportTemplateExcel(onReady: (String, ByteArray) -> Unit) {
@@ -786,11 +808,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         _uiState.update { it.copy(reportWholeSchool = wholeSchool, sheetFeedback = null) }
         viewModelScope.launch {
             val (bundle, stats, contacts) = withContext(Dispatchers.IO) {
-                Triple(
-                    engine.generatePrincipalReport(cls.major, cls.grade, cls.section, st.selectedDate.toString(), wholeSchool, st.teacherName),
-                    engine.getBackupStats(),
-                    engine.getSavedContacts()
-                )
+                Triple(engine.generatePrincipalReport(cls.major, cls.grade, cls.section, st.selectedDate.toString(), wholeSchool, st.teacherName), engine.getBackupStats(), engine.getSavedContacts())
             }
             _uiState.update { it.copy(principalReport = bundle, backupStats = stats, savedContacts = contacts) }
         }
@@ -801,9 +819,7 @@ class AttendanceViewModel(private val engine: AttendanceEngine) : ViewModel() {
         _uiState.update { it.copy(sheetFeedback = null) }
         viewModelScope.launch {
             try {
-                val msg = withContext(Dispatchers.IO) {
-                    engine.generatePeriodGroupMessage(cls.major, cls.grade, cls.section, st.selectedDate.toString(), st.selectedPeriod, target, st.teacherName, st.lessonName, st.reportWholeSchool)
-                }
+                val msg = withContext(Dispatchers.IO) { engine.generatePeriodGroupMessage(cls.major, cls.grade, cls.section, st.selectedDate.toString(), st.selectedPeriod, target, st.teacherName, st.lessonName, st.reportWholeSchool) }
                 onReady(msg)
             } catch (e: Exception) { _uiState.update { it.copy(sheetFeedback = e.message ?: "موردی یافت نشد") } }
         }
@@ -888,7 +904,7 @@ def main():
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(content, encoding="utf-8", newline="\n")
         print(f"Created: {rel}")
-    print(f"\nPart 2 (Android Base v4.0) done: {len(FILES)} files.")
+    print(f"\nPart 2 (Android Base v5.0) done: {len(FILES)} files.")
 
 
 if __name__ == "__main__":

@@ -18,23 +18,13 @@ import uniffi.hozoor_core.Period
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ExpressiveAttendanceToolbar(
-    selectedPeriod: Period,
-    onResetAllPresent: () -> Unit,
-    onCopyFromPrevious: () -> Unit,
-    onAddStudent: () -> Unit,
-    onOpenExportSheet: () -> Unit,
-    onImportFile: () -> Unit,
-    modifier: Modifier = Modifier
+    selectedPeriod: Period, onResetAllPresent: () -> Unit, onCopyFromPrevious: () -> Unit,
+    onAddStudent: () -> Unit, onOpenExportSheet: () -> Unit, onImportFile: () -> Unit, modifier: Modifier = Modifier
 ) {
     HorizontalFloatingToolbar(
-        expanded = true,
-        modifier = modifier,
+        expanded = true, modifier = modifier,
         colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
-        floatingActionButton = {
-            FloatingToolbarDefaults.VibrantFloatingActionButton(onClick = onImportFile) {
-                Icon(Icons.Rounded.UploadFile, "ورود اکسل یا CSV")
-            }
-        }
+        floatingActionButton = { FloatingToolbarDefaults.VibrantFloatingActionButton(onClick = onImportFile) { Icon(Icons.Rounded.UploadFile, "ورود اکسل یا CSV") } }
     ) {
         IconButton(onClick = onResetAllPresent) { Icon(Icons.Rounded.DoneAll, "همه حاضر") }
         IconButton(onClick = onCopyFromPrevious, enabled = selectedPeriod != Period.FIRST) { Icon(Icons.Rounded.ContentCopy, "کپی زنگ قبل") }

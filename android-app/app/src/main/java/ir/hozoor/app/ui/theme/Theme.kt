@@ -21,11 +21,11 @@ object StatusColors {
     val OnPresent = Color.White
     val Absent = Color(0xFFDC2626)
     val OnAbsent = Color.White
-    val Late = Color(0xFFFACC15)
+    val Late = Color(0xFFF59E0B)
     val OnLate = Color(0xFF1A1A1A)
     val Excused = Color(0xFF2563EB)
     val OnExcused = Color.White
-    val LeftClass = Color(0xFF9333EA) // بنفش پرکنتراست برای خروج از کلاس
+    val LeftClass = Color(0xFF9333EA)
     val OnLeftClass = Color.White
 }
 

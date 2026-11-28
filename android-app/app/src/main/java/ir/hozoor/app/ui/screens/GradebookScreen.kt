@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,7 +17,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.TableChart
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
@@ -43,10 +44,10 @@ import androidx.compose.ui.window.Dialog
 import ir.hozoor.app.ui.components.ClassCategorySelector
 import ir.hozoor.app.ui.components.QuickGradeDialog
 import ir.hozoor.app.ui.components.toPersianDigits
+import ir.hozoor.app.util.FileShareHelper
 import uniffi.hozoor_core.GradeCategory
 import uniffi.hozoor_core.StudentGradeRow
 
-/** دفتر نمره کامل: مستمر مهر/آبان/آذر/دی، پودمانی ۱ تا ۵ و امکان ساخت هر عنوان دلخواه توسط معلم */
 @Composable
 fun GradebookContent(
     majors: List<String>, selectedMajor: String,
@@ -56,21 +57,27 @@ fun GradebookContent(
     categories: List<GradeCategory>,
     selectedCategoryId: Long,
     studentGrades: List<StudentGradeRow>,
+    searchQuery: String,
+    onSearchChange: (String) -> Unit,
     onSelectCategory: (Long) -> Unit,
     onAddCategory: (String) -> Unit,
     onDeleteCategory: (Long) -> Unit,
-    onSaveGrade: (studentId: Long, categoryId: Long, score: String, note: String) -> Unit,
+    onSaveGrade: (Long, Long, String, String) -> Unit,
     onExportGradebookExcel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showAddCatDialog by remember { mutableStateOf(false) }
     var editingRow by remember { mutableStateOf<StudentGradeRow?>(null) }
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 32.dp, top = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
+    val filtered = remember(studentGrades, searchQuery) {
+        val q = FileShareHelper.normalizePersianSearch(searchQuery)
+        if (q.isEmpty()) studentGrades
+        else studentGrades.filter { r ->
+            FileShareHelper.normalizePersianSearch("${r.firstName} ${r.lastName} ${r.fatherName} ${r.score}").contains(q)
+        }
+    }
+
+    LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp, top = 2.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item(key = "gb_cats") {
             ClassCategorySelector(majors, selectedMajor, grades, selectedGrade, sections, selectedSection, onSelectMajor, onSelectGrade, onSelectSection)
         }
@@ -87,11 +94,7 @@ fun GradebookContent(
 
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         items(categories, key = { it.id }) { cat ->
-                            FilterChip(
-                                selected = cat.id == selectedCategoryId,
-                                onClick = { onSelectCategory(cat.id) },
-                                label = { Text(cat.name, fontWeight = if (cat.id == selectedCategoryId) FontWeight.ExtraBold else FontWeight.Medium) }
-                            )
+                            FilterChip(selected = cat.id == selectedCategoryId, onClick = { onSelectCategory(cat.id) }, label = { Text(cat.name, fontWeight = if (cat.id == selectedCategoryId) FontWeight.ExtraBold else FontWeight.Medium) })
                         }
                     }
 
@@ -100,22 +103,33 @@ fun GradebookContent(
                             Icon(Icons.Rounded.TableChart, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("خروجی اکسل دفتر نمره")
                         }
                         if (categories.size > 1 && selectedCategoryId > 0) {
-                            IconButton(onClick = { onDeleteCategory(selectedCategoryId) }) {
-                                Icon(Icons.Rounded.Delete, "حذف این عنوان", tint = MaterialTheme.colorScheme.error)
-                            }
+                            IconButton(onClick = { onDeleteCategory(selectedCategoryId) }) { Icon(Icons.Rounded.Delete, "حذف عنوان", tint = MaterialTheme.colorScheme.error) }
                         }
                     }
                 }
             }
         }
 
-        itemsIndexed(studentGrades, key = { _, r -> r.studentId }) { idx, row ->
-            Surface(
-                onClick = { editingRow = row },
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
+        // باکس جستجو در دفتر نمره
+        item(key = "gb_search") {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchChange,
+                placeholder = { Text("جستجوی دانش‌آموز در دفتر نمره...") },
+                leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { onSearchChange("") }) { Icon(Icons.Rounded.Close, "پاک کردن") }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(22.dp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-            ) {
+            )
+        }
+
+        itemsIndexed(filtered, key = { _, r -> r.studentId }) { idx, row ->
+            Surface(onClick = { editingRow = row }, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 Row(modifier = Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("${toPersianDigits((idx + 1).toString())}. ${row.firstName} ${row.lastName}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -125,14 +139,10 @@ fun GradebookContent(
                         }
                         if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = if (row.score.isNotBlank()) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
-                    ) {
+                    Surface(shape = RoundedCornerShape(14.dp), color = if (row.score.isNotBlank()) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh) {
                         Text(
                             text = if (row.score.isNotBlank()) toPersianDigits(row.score) else "ثبت نمره",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.ExtraBold,
+                            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.ExtraBold,
                             color = if (row.score.isNotBlank()) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                         )
@@ -159,14 +169,6 @@ fun GradebookContent(
     }
 
     editingRow?.let { row ->
-        QuickGradeDialog(
-            studentName = "${row.firstName} ${row.lastName}",
-            categories = categories,
-            initialCategoryId = selectedCategoryId,
-            initialScore = row.score,
-            initialNote = row.note,
-            onSave = { cid, sc, nt -> onSaveGrade(row.studentId, cid, sc, nt) },
-            onDismiss = { editingRow = null }
-        )
+        QuickGradeDialog("${row.firstName} ${row.lastName}", categories, selectedCategoryId, row.score, row.note, { cid, sc, nt -> onSaveGrade(row.studentId, cid, sc, nt) }) { editingRow = null }
     }
 }

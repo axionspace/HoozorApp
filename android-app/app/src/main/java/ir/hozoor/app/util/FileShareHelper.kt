@@ -25,6 +25,47 @@ object FileShareHelper {
         context.startActivity(Intent.createChooser(intent, chooserTitle))
     }
 
+    /**
+     * ساخت Intent مطمئن انتخاب مخاطب برای همه گوشی‌ها (به‌ویژه رفع باگ شیائومی MIUI/HyperOS
+     * که در حالت عادی فایل منیجر را باز می‌کرد). بدون نیاز به مجوز READ_CONTACTS.
+     */
+    fun createPickPhoneContactIntent(context: Context): Intent {
+        val intent = Intent(Intent.ACTION_PICK).apply {
+            type = ContactsContract.CommonDataKinds.Phone.CONTENT_TYPE
+        }
+        val pm = context.packageManager
+        val resolved = runCatching { pm.queryIntentActivities(intent, 0) }.getOrDefault(emptyList())
+        val realContactsApp = resolved.firstOrNull { info ->
+            val pkg = info.activityInfo.packageName.lowercase()
+            val notFileManager = !pkg.contains("file") && !pkg.contains("explorer") && !pkg.contains("document")
+            notFileManager && (pkg.contains("contacts") || pkg.contains("dialer") || pkg.contains("phone"))
+        } ?: resolved.firstOrNull { info ->
+            val pkg = info.activityInfo.packageName.lowercase()
+            !pkg.contains("file") && !pkg.contains("explorer") && !pkg.contains("document")
+        }
+        if (realContactsApp != null) {
+            intent.setPackage(realContactsApp.activityInfo.packageName)
+        }
+        return intent
+    }
+
+    fun extractPhoneContact(context: Context, uri: Uri): Pair<String, String>? {
+        val proj = arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER)
+        context.contentResolver.query(uri, proj, null, null, null)?.use { c ->
+            if (c.moveToFirst()) {
+                val nIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                val pIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+                val name = if (nIdx >= 0) c.getString(nIdx).orEmpty() else ""
+                val raw = if (pIdx >= 0) c.getString(pIdx).orEmpty() else ""
+                val clean = raw.replace(Regex("[^0-9+]"), "")
+                    .let { if (it.startsWith("+98")) "0" + it.removePrefix("+98") else it }
+                    .replace(Regex("[^0-9]"), "")
+                if (clean.isNotBlank()) return name.ifBlank { "مخاطب" } to clean
+            }
+        }
+        return null
+    }
+
     fun openSmsApp(context: Context, phone: String, body: String): Boolean {
         val clean = phone.trim()
         val list = listOf(
@@ -49,20 +90,12 @@ object FileShareHelper {
             else -> d
         }
         val url = if (intl.isNotBlank()) "https://wa.me/$intl?text=${Uri.encode(body)}" else "https://wa.me/?text=${Uri.encode(body)}"
-        return runCatching {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-            true
-        }.getOrElse {
-            shareText(context, body, "ارسال پیام")
-            false
-        }
+        return runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))); true }
+            .getOrElse { shareText(context, body, "ارسال پیام"); false }
     }
 
     fun shareText(context: Context, text: String, title: String) {
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, text)
-        }
+        val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, text) }
         context.startActivity(Intent.createChooser(intent, title))
     }
 
@@ -71,23 +104,11 @@ object FileShareHelper {
         cm.setPrimaryClip(ClipData.newPlainText(label, text))
     }
 
-    /** استخراج نام و شماره موبایل از مخاطب انتخاب‌شده توسط سیستم اندروید (بدون نیاز به مجوز READ_CONTACTS) */
-    fun extractPhoneContact(context: Context, uri: Uri): Pair<String, String>? {
-        val proj = arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER)
-        context.contentResolver.query(uri, proj, null, null, null)?.use { c ->
-            if (c.moveToFirst()) {
-                val nIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
-                val pIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
-                val name = if (nIdx >= 0) c.getString(nIdx).orEmpty() else ""
-                val raw = if (pIdx >= 0) c.getString(pIdx).orEmpty() else ""
-                val clean = raw.replace(Regex("[^0-9+]"), "")
-                    .let { if (it.startsWith("+98")) "0" + it.removePrefix("+98") else it }
-                    .replace(Regex("[^0-9]"), "")
-                if (clean.isNotBlank()) return name.ifBlank { "مخاطب" } to clean
-            }
-        }
-        return null
-    }
+    fun normalizePersianSearch(text: String): String = text.trim()
+        .replace('ي', 'ی').replace('ى', 'ی').replace('ك', 'ک')
+        .replace('۰', '0').replace('۱', '1').replace('۲', '2').replace('۳', '3').replace('۴', '4')
+        .replace('۵', '5').replace('۶', '6').replace('۷', '7').replace('۸', '8').replace('۹', '9')
+        .lowercase()
 
     fun resolveFileName(context: Context, uri: Uri): String {
         context.contentResolver.query(uri, null, null, null, null)?.use { c ->

@@ -32,7 +32,6 @@ private val ALL_PERIODS = listOf(
     Period.FOURTH to "زنگ ۴"
 )
 
-/** رفع کامل مشکل ناپدید شدن عدد زنگ کنار آیکون با تنظیم دقیق padding داخلی */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PeriodSelector(selectedPeriod: Period, onSelectPeriod: (Period) -> Unit, modifier: Modifier = Modifier) {
@@ -50,10 +49,7 @@ fun PeriodSelector(selectedPeriod: Period, onSelectPeriod: (Period) -> Unit, mod
             }
             ToggleButton(
                 checked = checked,
-                onCheckedChange = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onSelectPeriod(period)
-                },
+                onCheckedChange = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onSelectPeriod(period) },
                 modifier = Modifier.weight(1f),
                 shapes = shapes,
                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
@@ -68,13 +64,7 @@ fun PeriodSelector(selectedPeriod: Period, onSelectPeriod: (Period) -> Unit, mod
                     Icon(Icons.Rounded.NotificationsActive, null, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(2.dp))
                 }
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (checked) FontWeight.ExtraBold else FontWeight.SemiBold,
-                    maxLines = 1,
-                    softWrap = false
-                )
+                Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = if (checked) FontWeight.ExtraBold else FontWeight.SemiBold, maxLines = 1, softWrap = false)
             }
         }
     }

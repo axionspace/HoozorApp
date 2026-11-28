@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -46,23 +47,40 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.hozoor.app.ui.theme.StatusColors
+import ir.hozoor.app.ui.theme.VazirmatnFontFamily
 import uniffi.hozoor_core.AttendanceStatus
 import uniffi.hozoor_core.Period
 import uniffi.hozoor_core.StudentAttendanceRow
 
-/** کارت مدرن با دایره‌های کوچک غیرکلیکی ۱ تا ۴ (حاشیه سفید برای زنگ فعال، بدون بریدن نام دانش‌آموز) + وضعیت خروج از کلاس */
+/** رفع قطعی افتادگی عدد داخل دایره‌های کوچک با حذف پدینگ عمودی فونت وزیرمتن */
+@Suppress("DEPRECATION")
+private val PeriodDotTextStyle = TextStyle(
+    fontFamily = VazirmatnFontFamily,
+    fontSize = 10.sp,
+    lineHeight = 10.sp,
+    fontWeight = FontWeight.ExtraBold,
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Center,
+        trim = LineHeightStyle.Trim.Both
+    )
+)
+
 @Composable
 fun StudentAttendanceCard(
     indexInClass: Int,
     student: StudentAttendanceRow,
     selectedPeriod: Period,
     onStatusChange: (AttendanceStatus) -> Unit,
-    onRequestLeftClass: () -> Unit,
+    onRequestTimedStatus: (AttendanceStatus) -> Unit,
     onSendIndividualNotice: (StudentAttendanceRow, AttendanceStatus) -> Unit,
     onCallParent: (String) -> Unit,
     onQuickGrade: (StudentAttendanceRow) -> Unit,
@@ -92,29 +110,17 @@ fun StudentAttendanceCard(
                 Spacer(Modifier.width(9.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "${student.firstName} ${student.lastName}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Text("${student.firstName} ${student.lastName}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     val meta = buildString {
                         if (student.fatherName.isNotBlank()) append("فرزند ${student.fatherName}")
-                        if (student.latestGrade.isNotBlank()) {
-                            if (isNotEmpty()) append(" • ")
-                            append("آخرین نمره: ${toPersianDigits(student.latestGrade)}")
-                        }
+                        if (student.latestGrade.isNotBlank()) { if (isNotEmpty()) append(" • "); append("آخرین نمره: ${toPersianDigits(student.latestGrade)}") }
                     }
-                    if (meta.isNotBlank()) {
-                        Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
+                    if (meta.isNotBlank()) Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
 
                 Spacer(Modifier.width(6.dp))
 
-                // عددهای کوچک ۱ تا ۴ (غیرکلیکی، حاشیه سفید روی زنگ فعال، بدون اشغال فضای نام)
+                // دایره‌های یکدست ۲۱dp غیرکلیکی با تراز دقیق مرکزی در هر دو حالت انتخاب‌شده و انتخاب‌نشده
                 Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
                     for (i in 0..3) {
                         val raw = student.periodStatuses.getOrElse(i) { AttendanceStatus.UNMARKED }
@@ -127,42 +133,44 @@ fun StudentAttendanceCard(
                             color = dotBg,
                             border = if (isAct) BorderStroke(1.8.dp, Color.White) else null,
                             shadowElevation = if (isAct) 2.dp else 0.dp,
-                            modifier = Modifier.size(if (isAct) 22.dp else 19.dp)
+                            modifier = Modifier.size(21.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(toPersianDigits((i + 1).toString()), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = dotFg)
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Text(text = toPersianDigits((i + 1).toString()), style = PeriodDotTextStyle, color = dotFg)
                             }
                         }
                     }
                 }
             }
 
-            // نمایش برچسب ساعت خروج از کلاس (قابل لمس برای ویرایش ساعت خروج)
-            AnimatedVisibility(visible = student.currentStatus == AttendanceStatus.LEFT_CLASS) {
+            // نوار نمایش ساعت برای هر دو وضعیت «تأخیر» و «خروج از کلاس»
+            val showTimedBanner = student.currentStatus == AttendanceStatus.LEFT_CLASS || (student.currentStatus == AttendanceStatus.LATE && (student.eventTime.isNotBlank() || student.note.isNotBlank()))
+            AnimatedVisibility(visible = showTimedBanner) {
+                val isLateBanner = student.currentStatus == AttendanceStatus.LATE
+                val bColor = if (isLateBanner) StatusColors.Late else StatusColors.LeftClass
                 Surface(
-                    onClick = onRequestLeftClass,
+                    onClick = { onRequestTimedStatus(student.currentStatus) },
                     shape = RoundedCornerShape(12.dp),
-                    color = StatusColors.LeftClass.copy(alpha = 0.14f),
-                    border = BorderStroke(1.dp, StatusColors.LeftClass.copy(alpha = 0.5f)),
+                    color = bColor.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, bColor.copy(alpha = 0.5f)),
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 ) {
                     Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.DirectionsRun, null, tint = StatusColors.LeftClass, modifier = Modifier.size(16.dp))
+                        Icon(if (isLateBanner) Icons.Rounded.Schedule else Icons.Rounded.DirectionsRun, null, tint = bColor, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         val info = buildString {
-                            append("خروج از کلاس")
-                            if (student.exitTime.isNotBlank()) append(" ساعت ${toPersianDigits(student.exitTime)}")
+                            append(if (isLateBanner) "تأخیر در ورود" else "خروج از کلاس")
+                            if (student.eventTime.isNotBlank()) append(" ساعت ${toPersianDigits(student.eventTime)}")
                             if (student.note.isNotBlank()) append(" (${student.note})")
                         }
-                        Text(info, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = StatusColors.LeftClass, modifier = Modifier.weight(1f))
-                        Text("تغییر ساعت", style = MaterialTheme.typography.labelSmall, color = StatusColors.LeftClass)
+                        Text(info, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                        Text("ویرایش ساعت", style = MaterialTheme.typography.labelSmall, color = bColor, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
             Spacer(Modifier.height(10.dp))
 
-            // ۵ وضعیت با انیمیشن فنری: حاضر، غایب، تأخیر، موجه، خروج
             Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.fillMaxWidth().padding(3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                     AnimatedStatusPill("حاضر", Icons.Rounded.Check, student.currentStatus == AttendanceStatus.PRESENT, StatusColors.Present, StatusColors.OnPresent, Modifier.weight(1f)) {
@@ -172,13 +180,13 @@ fun StudentAttendanceCard(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress); onStatusChange(AttendanceStatus.ABSENT)
                     }
                     AnimatedStatusPill("تأخیر", Icons.Rounded.Schedule, student.currentStatus == AttendanceStatus.LATE, StatusColors.Late, StatusColors.OnLate, Modifier.weight(1f)) {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onStatusChange(AttendanceStatus.LATE)
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress); onRequestTimedStatus(AttendanceStatus.LATE)
                     }
                     AnimatedStatusPill("موجه", Icons.Rounded.VerifiedUser, student.currentStatus == AttendanceStatus.EXCUSED, StatusColors.Excused, StatusColors.OnExcused, Modifier.weight(1f)) {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onStatusChange(AttendanceStatus.EXCUSED)
                     }
                     AnimatedStatusPill("خروج", Icons.Rounded.DirectionsRun, student.currentStatus == AttendanceStatus.LEFT_CLASS, StatusColors.LeftClass, StatusColors.OnLeftClass, Modifier.weight(1f)) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress); onRequestLeftClass()
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress); onRequestTimedStatus(AttendanceStatus.LEFT_CLASS)
                     }
                 }
             }
@@ -215,8 +223,7 @@ private fun AnimatedStatusPill(label: String, icon: ImageVector, selected: Boole
 
     Column(
         modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }.clip(RoundedCornerShape(corner)).background(bg).clickable(onClick = onClick).padding(vertical = 6.dp, horizontal = 2.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
     ) {
         Icon(icon, label, tint = fg, modifier = Modifier.size(15.dp))
         Text(label, fontSize = 11.sp, fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold, color = fg, maxLines = 1, softWrap = false)
@@ -229,11 +236,9 @@ private fun ActionPill(label: String, icon: ImageVector, enabled: Boolean, bg: C
     val aFg by animateColorAsState(if (enabled) fg else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f), label = "aFg")
     Row(
         modifier = modifier.clip(RoundedCornerShape(13.dp)).background(aBg).clickable(enabled = enabled, onClick = onClick).padding(vertical = 7.dp, horizontal = 6.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
+        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, label, tint = aFg, modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(4.dp))
+        Icon(icon, label, tint = aFg, modifier = Modifier.size(15.dp)); Spacer(Modifier.width(4.dp))
         Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = aFg, maxLines = 1)
     }
 }

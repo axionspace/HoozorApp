@@ -37,9 +37,7 @@ fun ClassCategorySelector(
     majors: List<String>, selectedMajor: String,
     grades: List<String>, selectedGrade: String,
     sections: List<Int>, selectedSection: Int,
-    onSelectMajor: (String) -> Unit,
-    onSelectGrade: (String) -> Unit,
-    onSelectSection: (Int) -> Unit,
+    onSelectMajor: (String) -> Unit, onSelectGrade: (String) -> Unit, onSelectSection: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -81,9 +79,7 @@ private fun <T> AnimatedCategoryGrid(
                         val scale by animateFloatAsState(if (isSel) 1.03f else 0.98f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium), label = "cSc")
                         Surface(
                             onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onSelect(item) },
-                            shape = RoundedCornerShape(corner),
-                            color = bg,
-                            shadowElevation = if (isSel) 3.dp else 0.dp,
+                            shape = RoundedCornerShape(corner), color = bg, shadowElevation = if (isSel) 3.dp else 0.dp,
                             modifier = Modifier.weight(1f).height(itemHeight).graphicsLayer { scaleX = scale; scaleY = scale }
                         ) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp, vertical = 4.dp)) {

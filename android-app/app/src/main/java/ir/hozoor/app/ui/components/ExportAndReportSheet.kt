@@ -58,7 +58,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import ir.hozoor.app.ui.theme.StatusColors
 import uniffi.hozoor_core.AttendanceStatus
 import uniffi.hozoor_core.BackupStats
 import uniffi.hozoor_core.PeriodSummary
@@ -66,7 +65,6 @@ import uniffi.hozoor_core.PrincipalReportBundle
 import uniffi.hozoor_core.SavedContact
 import uniffi.hozoor_core.StudentAttendanceRow
 
-/** مرکز کامل ارسال و اشتراک‌گذاری: انتخاب از مخاطبین گوشی، ویرایش متن، پیامک، واتساپ، پیام‌رسان، اطلاع‌رسانی اولیا و پشتیبان */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportAndReportSheet(
@@ -83,11 +81,11 @@ fun ExportAndReportSheet(
     onRecipientPhoneChange: (String) -> Unit,
     onPickPhoneContact: () -> Unit,
     onSelectSavedContact: (SavedContact) -> Unit,
-    onSaveCurrentContact: (name: String, phone: String) -> Unit,
+    onSaveCurrentContact: (String, String) -> Unit,
     onDeleteSavedContact: (Long) -> Unit,
     onLoadPeriodGroupMessage: (AttendanceStatus, (String) -> Unit) -> Unit,
-    onSendSms: (phone: String, text: String) -> Unit,
-    onSendWhatsApp: (phone: String, text: String) -> Unit,
+    onSendSms: (String, String) -> Unit,
+    onSendWhatsApp: (String, String) -> Unit,
     onShareText: (String) -> Unit,
     onCopyText: (String) -> Unit,
     onNotifyParentSms: (StudentAttendanceRow) -> Unit,
@@ -101,7 +99,6 @@ fun ExportAndReportSheet(
     onRestoreBackupJson: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    // 0=گزارش کامل، 1=پیامک فشرده، 2=غایبین این زنگ، 3=تأخیری این زنگ، 4=خروج از کلاس
     var msgMode by remember { mutableIntStateOf(0) }
     var editableText by remember { mutableStateOf("") }
     var contactLabel by remember(recipientName) { mutableStateOf(recipientName.ifBlank { "مدیر" }) }
@@ -130,7 +127,6 @@ fun ExportAndReportSheet(
                 }
             }
 
-            // ۱) بخش انتخاب مخاطب از گوشی و مخاطبین ذخیره‌شده
             Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -160,24 +156,8 @@ fun ExportAndReportSheet(
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = recipientPhone,
-                            onValueChange = onRecipientPhoneChange,
-                            label = { Text("شماره گیرنده") },
-                            placeholder = { Text("0917xxxxxxx") },
-                            leadingIcon = { Icon(Icons.Rounded.Phone, null) },
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.weight(1.3f)
-                        )
-                        OutlinedTextField(
-                            value = contactLabel,
-                            onValueChange = { contactLabel = it },
-                            label = { Text("نام") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.weight(0.8f)
-                        )
+                        OutlinedTextField(value = recipientPhone, onValueChange = onRecipientPhoneChange, label = { Text("شماره گیرنده") }, placeholder = { Text("0917xxxxxxx") }, leadingIcon = { Icon(Icons.Rounded.Phone, null) }, singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.weight(1.3f))
+                        OutlinedTextField(value = contactLabel, onValueChange = { contactLabel = it }, label = { Text("نام") }, singleLine = true, shape = RoundedCornerShape(14.dp), modifier = Modifier.weight(0.8f))
                         IconButton(onClick = { onSaveCurrentContact(contactLabel, recipientPhone) }) {
                             Icon(Icons.Rounded.BookmarkAdd, "ذخیره مخاطب", tint = MaterialTheme.colorScheme.primary)
                         }
@@ -185,7 +165,6 @@ fun ExportAndReportSheet(
                 }
             }
 
-            // ۲) انتخاب گستره و نوع گزارش
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterChip(selected = !wholeSchool, onClick = { onToggleWholeSchool(false); msgMode = 0 }, label = { Text("کلاس فعلی") })
                 FilterChip(selected = wholeSchool, onClick = { onToggleWholeSchool(true); msgMode = 0 }, label = { Text("کل کلاس‌ها") })
@@ -194,52 +173,18 @@ fun ExportAndReportSheet(
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 item { FilterChip(selected = msgMode == 0, onClick = { msgMode = 0 }, label = { Text("گزارش کامل روز") }) }
                 item { FilterChip(selected = msgMode == 1, onClick = { msgMode = 1 }, label = { Text("پیامک فشرده روز") }) }
-                item {
-                    FilterChip(
-                        selected = msgMode == 2,
-                        onClick = { onLoadPeriodGroupMessage(AttendanceStatus.ABSENT) { txt -> msgMode = 2; editableText = txt } },
-                        label = { Text("غیبت این زنگ (${toPersianDigits(summary.absent.toString())})") }
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = msgMode == 3,
-                        onClick = { onLoadPeriodGroupMessage(AttendanceStatus.LATE) { txt -> msgMode = 3; editableText = txt } },
-                        label = { Text("تأخیر (${toPersianDigits(summary.late.toString())})") }
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = msgMode == 4,
-                        onClick = { onLoadPeriodGroupMessage(AttendanceStatus.LEFT_CLASS) { txt -> msgMode = 4; editableText = txt } },
-                        label = { Text("خروج از کلاس (${toPersianDigits(summary.leftClass.toString())})") }
-                    )
-                }
+                item { FilterChip(selected = msgMode == 2, onClick = { onLoadPeriodGroupMessage(AttendanceStatus.ABSENT) { msgMode = 2; editableText = it } }, label = { Text("غیبت این زنگ (${toPersianDigits(summary.absent.toString())})") }) }
+                item { FilterChip(selected = msgMode == 3, onClick = { onLoadPeriodGroupMessage(AttendanceStatus.LATE) { msgMode = 3; editableText = it } }, label = { Text("تأخیر (${toPersianDigits(summary.late.toString())})") }) }
+                item { FilterChip(selected = msgMode == 4, onClick = { onLoadPeriodGroupMessage(AttendanceStatus.LEFT_CLASS) { msgMode = 4; editableText = it } }, label = { Text("خروج از کلاس (${toPersianDigits(summary.leftClass.toString())})") }) }
             }
 
-            // کادر متن قابل ویرایش مستقیم قبل از ارسال
-            OutlinedTextField(
-                value = editableText,
-                onValueChange = { editableText = it },
-                label = { Text("متن آماده ارسال (قابل ویرایش دستی)") },
-                minLines = 4,
-                maxLines = 9,
-                shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth()
-            )
+            OutlinedTextField(value = editableText, onValueChange = { editableText = it }, label = { Text("متن آماده ارسال (قابل ویرایش دستی)") }, minLines = 4, maxLines = 9, shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth())
 
-            // دکمه‌های ارسال چندکاناله: پیامک، واتساپ، پیام‌رسان‌ها، کپی
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Button(onClick = { onSendSms(recipientPhone, editableText) }, enabled = editableText.isNotBlank(), modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp)) {
                     Icon(Icons.Rounded.Sms, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("پیامک عادی", maxLines = 1)
                 }
-                Button(
-                    onClick = { onSendWhatsApp(recipientPhone, editableText) },
-                    enabled = editableText.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A), contentColor = Color.White),
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp)
-                ) {
+                Button(onClick = { onSendWhatsApp(recipientPhone, editableText) }, enabled = editableText.isNotBlank(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A), contentColor = Color.White), modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp)) {
                     Icon(Icons.Rounded.Chat, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("واتساپ", maxLines = 1)
                 }
             }
@@ -252,7 +197,6 @@ fun ExportAndReportSheet(
                 }
             }
 
-            // ۳) اطلاع‌رسانی سریع به اولیای دانش‌آموزان غایب/تأخیر/خروج
             if (flaggedStudents.isNotEmpty()) {
                 HorizontalDivider()
                 Text("اطلاع‌رسانی مستقیم به اولیا (${toPersianDigits(flaggedStudents.size.toString())} نفر)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold)
@@ -261,11 +205,12 @@ fun ExportAndReportSheet(
                         Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("${st.firstName} ${st.lastName}", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                                Text(
-                                    text = if (st.currentStatus == AttendanceStatus.LEFT_CLASS && st.exitTime.isNotBlank()) "خروج ${toPersianDigits(st.exitTime)}" else st.currentStatus.labelFa(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = statusPrimaryColor(st.currentStatus)
-                                )
+                                val subtitle = when {
+                                    st.currentStatus == AttendanceStatus.LEFT_CLASS && st.eventTime.isNotBlank() -> "خروج ساعت ${toPersianDigits(st.eventTime)}"
+                                    st.currentStatus == AttendanceStatus.LATE && st.eventTime.isNotBlank() -> "تأخیر ساعت ${toPersianDigits(st.eventTime)}"
+                                    else -> statusLabelFa(st.currentStatus)
+                                }
+                                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = statusPrimaryColor(st.currentStatus))
                             }
                             IconButton(onClick = { onNotifyParentSms(st) }) { Icon(Icons.Rounded.Sms, "پیامک ولی", tint = MaterialTheme.colorScheme.primary) }
                             IconButton(onClick = { onNotifyParentWhatsApp(st) }) { Icon(Icons.Rounded.Chat, "واتساپ ولی", tint = Color(0xFF16A34A)) }
@@ -275,8 +220,6 @@ fun ExportAndReportSheet(
             }
 
             HorizontalDivider()
-
-            // ۴) فایل‌های اکسل و CSV
             Text("خروجی اکسل و CSV", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalButton(onClick = onExportDailyExcel, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.TableChart, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("اکسل حضور") }
@@ -288,9 +231,7 @@ fun ExportAndReportSheet(
             }
 
             HorizontalDivider()
-
-            // ۵) پشتیبان‌گیری کلی از تمام اطلاعات
-            Text("پشتیبان‌گیری کلی (دانش‌آموزان، حضور، خروج، نمرات و مخاطبین)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text("پشتیبان‌گیری کلی", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             if (backupStats != null) {
                 Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
                     Text(
@@ -308,10 +249,10 @@ fun ExportAndReportSheet(
     }
 }
 
-private fun AttendanceStatus.labelFa(): String = when (this) {
+fun statusLabelFa(st: AttendanceStatus): String = when (st) {
     AttendanceStatus.ABSENT -> "غایب"
     AttendanceStatus.LATE -> "تأخیر"
-    AttendanceStatus.EXCUSED -> "موجه"
+    AttendanceStatus.EXCUSED -> "غیبت موجه"
     AttendanceStatus.LEFT_CLASS -> "خروج از کلاس"
     else -> "حاضر"
 }

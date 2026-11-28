@@ -1,7 +1,7 @@
 use crate::models::{
     AttendanceStatus, BackupStats, ClassAnalytics, ClassAttendanceSnapshot, ClassGroup, CoreError,
     GradeCategory, ImportReport, MonthlyClassReport, MonthlyStudentStat, Period, PeriodSummary,
-    SavedContact, StudentAttendanceRow, StudentGradeRow, TopStudentCount,
+    SavedContact, StudentAttendanceRow, StudentGradeRow, StudentMonthlyEvent, TopStudentCount,
 };
 use crate::persian::{
     format_iso_to_jalali, format_jalali_month_label, grade_rank, is_middle_grade,
@@ -45,9 +45,7 @@ pub fn init_database(db_path: &str) -> Result<Connection, CoreError> {
          );
 
          CREATE TABLE IF NOT EXISTS grade_categories (
-             id INTEGER PRIMARY KEY AUTOINCREMENT,
-             name TEXT NOT NULL UNIQUE,
-             sort_order INTEGER NOT NULL DEFAULT 0
+             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, sort_order INTEGER NOT NULL DEFAULT 0
          );
 
          CREATE TABLE IF NOT EXISTS student_grades (
@@ -59,8 +57,7 @@ pub fn init_database(db_path: &str) -> Result<Connection, CoreError> {
          );
 
          CREATE TABLE IF NOT EXISTS saved_contacts (
-             id INTEGER PRIMARY KEY AUTOINCREMENT,
-             name TEXT NOT NULL, role TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL UNIQUE
+             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL UNIQUE
          );
 
          CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -131,7 +128,7 @@ pub fn get_class_attendance(conn: &Connection, major: &str, grade: &str, section
         Ok(StudentAttendanceRow {
             student_id: r.get(0)?, row_num: r.get(1)?, first_name: r.get(2)?, last_name: r.get(3)?,
             father_name: r.get(4)?, national_id: r.get(5)?, mobile: r.get(6)?,
-            current_status: cur, period_statuses: sts, exit_time: r.get(11)?, note: r.get(12)?, latest_grade: r.get(13)?,
+            current_status: cur, period_statuses: sts, event_time: r.get(11)?, note: r.get(12)?, latest_grade: r.get(13)?,
         })
     }).map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))?;
 
@@ -151,11 +148,12 @@ pub fn get_class_attendance(conn: &Connection, major: &str, grade: &str, section
     Ok(ClassAttendanceSnapshot { jalali_date: format_iso_to_jalali(date_iso), is_period_saved: saved, summary: sum, students })
 }
 
-pub fn set_attendance(conn: &mut Connection, student_id: i64, date_iso: &str, period: Period, status: AttendanceStatus, exit_time: &str, note: &str, teacher: &str, lesson: &str, class_time: &str) -> Result<(), CoreError> {
+/// ذخیره ساعت هم برای «تأخیر» و هم برای «خروج از کلاس»
+pub fn set_attendance(conn: &mut Connection, student_id: i64, date_iso: &str, period: Period, status: AttendanceStatus, event_time: &str, note: &str, teacher: &str, lesson: &str, class_time: &str) -> Result<(), CoreError> {
     let tx = conn.transaction().map_err(|e| CoreError::Database(e.to_string()))?;
     let now = now_unix();
     let pn = period.to_i32();
-    let clean_exit = if status == AttendanceStatus::LeftClass { exit_time.trim() } else { "" };
+    let clean_time = if matches!(status, AttendanceStatus::LeftClass | AttendanceStatus::Late) { event_time.trim() } else { "" };
 
     tx.execute(
         "INSERT OR IGNORE INTO attendance (student_id, date_iso, period, status, exit_time, note, teacher_name, lesson_name, class_time, updated_at)
@@ -171,7 +169,7 @@ pub fn set_attendance(conn: &mut Connection, student_id: i64, date_iso: &str, pe
          ON CONFLICT(student_id, date_iso, period) DO UPDATE SET
              status=excluded.status, exit_time=excluded.exit_time, note=excluded.note,
              teacher_name=excluded.teacher_name, lesson_name=excluded.lesson_name, class_time=excluded.class_time, updated_at=excluded.updated_at",
-        params![student_id, date_iso, pn, status.to_i32(), clean_exit, note.trim(), teacher.trim(), lesson.trim(), class_time.trim(), now],
+        params![student_id, date_iso, pn, status.to_i32(), clean_time, note.trim(), teacher.trim(), lesson.trim(), class_time.trim(), now],
     ).map_err(|e| CoreError::Database(e.to_string()))?;
     tx.commit().map_err(|e| CoreError::Database(e.to_string()))?;
     Ok(())
@@ -238,7 +236,6 @@ pub fn delete_class(conn: &Connection, major: &str, grade: &str, section: i32) -
     Ok(d as i32)
 }
 
-// ===== دفتر نمره (مستمر ماهانه / پودمانی / دلخواه) =====
 pub fn get_grade_categories(conn: &Connection) -> Result<Vec<GradeCategory>, CoreError> {
     let mut st = conn.prepare_cached("SELECT id, name FROM grade_categories ORDER BY sort_order ASC, id ASC").map_err(|e| CoreError::Database(e.to_string()))?;
     let rows = st.query_map([], |r| Ok(GradeCategory { id: r.get(0)?, name: r.get(1)? }))
@@ -251,7 +248,7 @@ pub fn add_grade_category(conn: &Connection, name: &str) -> Result<i64, CoreErro
     if n.is_empty() { return Err(CoreError::InvalidInput("عنوان نمره را وارد کنید".into())); }
     let next_order: i32 = conn.query_row("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM grade_categories", [], |r| r.get(0)).unwrap_or(10);
     conn.execute("INSERT INTO grade_categories (name, sort_order) VALUES (?1, ?2)", params![n, next_order])
-        .map_err(|e| if e.to_string().contains("UNIQUE") { CoreError::InvalidInput("این عنوان نمره قبلاً وجود دارد".into()) } else { CoreError::Database(e.to_string()) })?;
+        .map_err(|e| if e.to_string().contains("UNIQUE") { CoreError::InvalidInput("این عنوان قبلاً وجود دارد".into()) } else { CoreError::Database(e.to_string()) })?;
     Ok(conn.last_insert_rowid())
 }
 
@@ -282,7 +279,6 @@ pub fn set_student_grade(conn: &Connection, student_id: i64, category_id: i64, s
     Ok(())
 }
 
-// ===== مخاطبین ذخیره‌شده (مدیر، معاون، مشاور...) =====
 pub fn get_saved_contacts(conn: &Connection) -> Result<Vec<SavedContact>, CoreError> {
     let mut st = conn.prepare_cached("SELECT id, name, role, phone FROM saved_contacts ORDER BY id ASC").map_err(|e| CoreError::Database(e.to_string()))?;
     let rows = st.query_map([], |r| Ok(SavedContact { id: r.get(0)?, name: r.get(1)?, role: r.get(2)?, phone: r.get(3)? }))
@@ -304,7 +300,6 @@ pub fn delete_contact(conn: &Connection, id: i64) -> Result<(), CoreError> {
     Ok(())
 }
 
-// ===== آمار و گزارش ماهانه =====
 pub fn get_backup_stats(conn: &Connection) -> Result<BackupStats, CoreError> {
     Ok(BackupStats {
         students_count: conn.query_row("SELECT COUNT(*) FROM students", [], |r| r.get(0)).unwrap_or(0),
@@ -343,6 +338,32 @@ pub fn get_class_analytics(conn: &Connection, major: &str, grade: &str, section:
         v.truncate(8); v
     };
     Ok(ClassAnalytics { student_count: names.len() as i32, recorded_sessions: sessions.len() as i32, total_absent: ta, total_late: tl, total_excused: te, total_left_class: tlc, top_absent: rank(ma), top_late: rank(ml), top_excused: rank(me), top_left_class: rank(mlc) })
+}
+
+/// جزئیات تاریخ‌به‌تاریخ غیبت‌ها، تأخیرها، غیبت‌های موجه و خروج‌های یک دانش‌آموز در یک ماه شمسی
+pub fn get_student_monthly_details(conn: &Connection, student_id: i64, jy: i32, jm_i: i32) -> Result<Vec<StudentMonthlyEvent>, CoreError> {
+    let jm = jm_i.clamp(1, 12) as u32;
+    let (s_iso, e_iso) = jalali_month_range_iso(jy, jm);
+    let mut st = conn.prepare_cached(
+        "SELECT date_iso, period, status, exit_time, note
+         FROM attendance
+         WHERE student_id=?1 AND date_iso>=?2 AND date_iso<=?3 AND status IN (2,3,4,5)
+         ORDER BY date_iso DESC, period ASC",
+    ).map_err(|e| CoreError::Database(e.to_string()))?;
+
+    st.query_map(params![student_id, s_iso, e_iso], |r| {
+        let date_iso: String = r.get(0)?;
+        let period = Period::from_i32(r.get(1)?);
+        let status = AttendanceStatus::from_i32(r.get(2)?);
+        Ok(StudentMonthlyEvent {
+            jalali_date: format_iso_to_jalali(&date_iso),
+            date_iso,
+            period_label: period.label_fa().to_string(),
+            status,
+            event_time: r.get(3)?,
+            note: r.get(4)?,
+        })
+    }).map_err(|e| CoreError::Database(e.to_string()))?.collect::<Result<Vec<_>, _>>().map_err(|e| CoreError::Database(e.to_string()))
 }
 
 pub fn get_monthly_report(conn: &Connection, major: &str, grade: &str, section: i32, jy: i32, jm_i: i32) -> Result<MonthlyClassReport, CoreError> {
@@ -392,7 +413,6 @@ pub fn get_monthly_report(conn: &Connection, major: &str, grade: &str, section: 
     })
 }
 
-// ===== پشتیبان کلی JSON (دانش‌آموزان + حضور + خروج + نمرات مستمر/پودمانی + مخاطبین + تنظیمات) =====
 #[derive(Serialize, Deserialize)]
 struct BkPayload {
     version: i32, students: Vec<BkStu>, attendance: Vec<BkAtt>,
@@ -435,7 +455,7 @@ pub fn export_backup_json(conn: &Connection) -> Result<String, CoreError> {
         let (k, v) = r.map_err(|e| CoreError::Database(e.to_string()))?;
         settings.insert(k, v);
     }
-    serde_json::to_string_pretty(&BkPayload { version: 4, students, attendance, grade_categories, grades, contacts, settings }).map_err(|e| CoreError::Import(e.to_string()))
+    serde_json::to_string_pretty(&BkPayload { version: 5, students, attendance, grade_categories, grades, contacts, settings }).map_err(|e| CoreError::Import(e.to_string()))
 }
 
 pub fn restore_backup_json(conn: &mut Connection, json_text: &str) -> Result<ImportReport, CoreError> {
